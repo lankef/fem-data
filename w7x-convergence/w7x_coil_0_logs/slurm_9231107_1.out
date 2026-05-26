@@ -1,0 +1,60 @@
+Job ID:         9231107
+Task:           1 / 8
+Nodes:          1
+CPUs per task:  4
+Start time:     Wed May 20 16:59:13 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+JAX devices: [CpuDevice(id=0)]
+[n=125] Compile + run: 26.208s  |  Run only: 16.100s
+JAX version: 0.6.2
+JAX devices: [CpuDevice(id=0)]
+============================================================
+Building per-base-coil FEM quadrature data ...
+Expanding to all symmetry images ...
+  n_base=1, nfp=1, stellsym=False → n_total=1
+
+============================================================
+Run A: volumetric Biot-Savart + dolfinx elasticity
+============================================================
+Computing B_self and B_ext via volumetric Biot-Savart ...
+  [vol-BS] coil 0: B_self (6750 target cells × 4 quad pts)...
+  [vol-BS] coil 0: B_ext ...
+
+[Run A] base coil 0 ...
+  [dolfinx] construction time: 0.094s
+  [dolfinx] solve time:        1.076s
+  [dolfinx] total time:        1.170s
+  → wrote w7x_coil_0_dolfinx/n_125/runA_volumetric_BS/coil_00_run_dolfinx.vtu
+
+  → wrote w7x_coil_0_dolfinx/n_125/runA_volumetric_BS/dolfinx_run.npz
+
+============================================================
+Run B
+============================================================
+  coil_fem.run() finished.
+
+[Run B] base coil 0 ...
+  [dolfinx] construction time: 0.041s
+  [dolfinx] solve time:        1.000s
+  [dolfinx] total time:        1.041s
+  → wrote w7x_coil_0_dolfinx/n_125/runB_coilfem_B/coil_00_run_dolfinx.vtu
+
+  → wrote w7x_coil_0_dolfinx/n_125/runB_coilfem_B/dolfinx_run.npz
+
+============================================================
+Comparing results ...
+
+[compare] wrote w7x_coil_0_dolfinx/n_125/comparison_summary.csv
+
+ coil  A/CF_vm_max%  B/CF_vm_max%  A/B_vm_max%
+    0          873.29%        858.06%        18.98%
+
+Done.  Output directory: w7x_coil_0_dolfinx/n_125
+End time:       Wed May 20 17:02:25 EDT 2026
