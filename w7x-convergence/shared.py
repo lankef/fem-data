@@ -626,7 +626,7 @@ def _build_fvol(
 def _dolfinx_solve(
     pts_np:          np.ndarray,  # (n_nodes, 3) [m]
     cells_np:        np.ndarray,  # (n_cells, 4 or 10) int TET4/TET10 connectivity
-    fvol_cell_mean:  np.ndarray,  # (n_cells, 3) [N/m³] cell-averaged body force
+    fvol_q:          np.ndarray,  # (n_cells, n_quads, 3) [N/m³] per-Gauss-pt body force
     spring_k_nodes:  np.ndarray,  # (n_nodes,) [N/m³] spring stiffness (0 = free)
     E:               float,       # Young's modulus [Pa]
     nu:              float,       # Poisson's ratio
@@ -634,11 +634,21 @@ def _dolfinx_solve(
 ) -> dict:
     """Solve linear elasticity with Winkler BC in dolfinx.
 
-    The body force is injected as a cell-constant (DG0) field — this is the
-    cell mean of ``fvol_quad`` from CoilFEM, which is also what ``save_run_vtu``
-    stores.  For TET4 elements with constant body force, the load vector is
-    identical to what JAX-FEM assembles, making Run B vs. CoilFEM a clean
-    elasticity-only comparison.      For TET10 elements, P2 Lagrange basis with a 4-point volume rule
+    Body force is injected via a Quadrature-degree function space so that each
+    Gauss point within a cell carries its own force value.  This matches
+    CoilFEM's per-quadrature-point load-vector assembly exactly::
+
+        L(Nᵢ) = Σ_q  f(xq) · Nᵢ(xq) · JxWq
+
+    Both JAX-FEM (via jax_fem.basis) and dolfinx (via basix) use the same
+    basix quadrature rule, so the within-cell Gauss-point ordering is
+    identical; only a cell-level permutation (coilforce → dolfinx) is needed.
+
+    Von Mises stress is evaluated at the same Gauss points and averaged per
+    cell, matching CoilFEM's ``mean(VM(xq), q=1..n_quads)`` convention as
+    written by ``save_run_vtu``.
+
+    For TET10 elements, P2 Lagrange basis with a 4-point volume rule
     (``quadrature_degree=2``) and a 6-point Dunavant face rule
     (``quadrature_degree=4``) matches CoilFEM's ``gauss_order=2`` volume
     and ``gauss_order=4`` face settings (the latter overrides the JAX-FEM
@@ -650,6 +660,9 @@ def _dolfinx_solve(
 
     Parameters
     ----------
+    fvol_q : (n_cells, n_quads, 3)
+        Body force at every FEM quadrature point [N/m³], in coilforce cell
+        order.  For TET10 with ``gauss_order=2`` this has ``n_quads=4``.
     spring_k_nodes : (n_nodes,)
         Winkler spring stiffness at every mesh node [N/m³].  Non-zero only on
         the Winkler surface; interior nodes must be 0.  Applied as a
@@ -661,8 +674,8 @@ def _dolfinx_solve(
     dict with keys:
         ``displacement``   (n_nodes, 3) [m]  — nodal displacement in coilforce
                            node order (KD-tree matched from dolfinx DOF order).
-        ``von_mises_cell`` (n_cells,)   [Pa] — DG0 cell-centre von Mises stress,
-                           in coilforce cell order.
+        ``von_mises_cell`` (n_cells,)   [Pa] — mean von Mises stress over
+                           Gauss points per cell, in coilforce cell order.
     """
     _require_dolfinx()
 
@@ -748,24 +761,47 @@ def _dolfinx_solve(
         return lam * ufl.tr(eps_m) * ufl.Identity(3) + 2 * mu * eps_m
 
     # ── Volume integration measure ────────────────────────────────────────────
-    # For TET10, enforce 4-point quadrature (gauss_order=2 in JAX-FEM basis.py).
-    # For TET4, let UFL choose the default (matches JAX-FEM's 1-point rule).
-    vol_meta = {"quadrature_degree": 2} if is_tet10 else {}
+    # vol_quad_degree must match JAX-FEM's gauss_order:
+    #   TET10 → gauss_order=2 → 4 Gauss pts → quadrature_degree=2
+    #   TET4  → gauss_order=1 → 1 Gauss pt  → quadrature_degree=1
+    # The explicit degree is required so that the Quadrature function space
+    # used for the body force and von Mises is evaluated at the same points
+    # as the dx measure (dolfinx raises an error if they disagree).
+    vol_quad_degree = 2 if is_tet10 else 1
+    vol_meta = {"quadrature_degree": vol_quad_degree}
     dx = ufl.dx(metadata=vol_meta)
 
     # ── Bilinear form ─────────────────────────────────────────────────────────
     a = ufl.inner(sigma(u), ufl.sym(ufl.grad(v))) * dx
 
-    # ── Body force (DG0, one value per cell per component) ───────────────────
-    # DG0 dof d corresponds to dolfinx cell d (≠ coilforce cell d, since
-    # `create_mesh` reorders).  Permute coilforce-ordered values into dolfinx
-    # cell order before assignment.
-    fvol_dfx = np.empty_like(fvol_cell_mean)
-    fvol_dfx[dolfinx_for_coilforce] = fvol_cell_mean   # advanced-index scatter
-    Q = fem.functionspace(mesh, ("DG", 0))
-    fx_fn = fem.Function(Q); fx_fn.x.array[:] = fvol_dfx[:, 0]; fx_fn.x.scatter_forward()
-    fy_fn = fem.Function(Q); fy_fn.x.array[:] = fvol_dfx[:, 1]; fy_fn.x.scatter_forward()
-    fz_fn = fem.Function(Q); fz_fn.x.array[:] = fvol_dfx[:, 2]; fz_fn.x.scatter_forward()
+    # ── Body force (Quadrature space, one value per Gauss point) ─────────────
+    # Use a Quadrature-degree function space so each of the n_quads Gauss
+    # points per cell carries its own body force value.  This makes the load
+    # vector assembly identical to CoilFEM:
+    #
+    #     L(Nᵢ) = Σ_q  f(xq) · Nᵢ(xq) · JxWq
+    #
+    # rather than the cruder DG0 approximation:
+    #
+    #     L(Nᵢ) = f̄_cell · ∫ Nᵢ dV
+    #
+    # which differs for TET10 (P2 basis) when f varies within the cell.
+    #
+    # DOF layout of a scalar Quadrature-k space: for each dolfinx cell (in
+    # dolfinx order), n_quads consecutive DOFs hold the per-point values in
+    # basix quadrature ordering.  Both JAX-FEM and dolfinx derive their
+    # quadrature rules from basix, so the within-cell ordering is the same;
+    # only a cell-level permutation is required.
+    #
+    # Build inverse permutation: coilforce_for_dolfinx[c_dfx] = c_cf
+    coilforce_for_dolfinx = np.empty(n_cells_dfx, dtype=np.intp)
+    coilforce_for_dolfinx[dolfinx_for_coilforce] = np.arange(n_cells_dfx, dtype=np.intp)
+    # Reorder fvol_q from coilforce cell order to dolfinx cell order.
+    fvol_q_dfx = fvol_q[coilforce_for_dolfinx]          # (n_cells_dfx, n_quads, 3)
+    QS = fem.functionspace(mesh, ("Quadrature", vol_quad_degree))
+    fx_fn = fem.Function(QS); fx_fn.x.array[:] = fvol_q_dfx[:, :, 0].ravel(); fx_fn.x.scatter_forward()
+    fy_fn = fem.Function(QS); fy_fn.x.array[:] = fvol_q_dfx[:, :, 1].ravel(); fy_fn.x.scatter_forward()
+    fz_fn = fem.Function(QS); fz_fn.x.array[:] = fvol_q_dfx[:, :, 2].ravel(); fz_fn.x.scatter_forward()
     f_ufl = ufl.as_vector([fx_fn, fy_fn, fz_fn])
 
     L = ufl.inner(f_ufl, v) * dx
@@ -854,23 +890,38 @@ def _dolfinx_solve(
     displacement = np.zeros((pts_np.shape[0], 3), dtype=np.float64)
     displacement = uh_arr[dof_for_node2]             # (n_nodes, 3), coilforce order
 
-    # ── Von Mises stress (DG0 cell-centre projection) ─────────────────────────
+    # ── Von Mises stress (Gauss-point evaluation, cell mean) ──────────────────
+    # Evaluate von Mises at the same n_quads Gauss points used for FEM
+    # assembly, then average per cell.  This matches CoilFEM's convention:
+    #
+    #     vm_cell[c] = mean( VM(xq),  q = 1..n_quads )
+    #
+    # as written by save_run_vtu:
+    #     jnp.mean(result['von_mises'][i], axis=-1)
+    #
+    # Using a DG0 projection (VM at centroid) instead would differ because
+    # von Mises is a nonlinear function of strain: mean(sqrt(…)) ≠ sqrt(…)
+    # evaluated at the centroid.
     def von_mises_ufl(u_fn):
         sig = sigma(u_fn)
         s   = sig - (ufl.tr(sig) / 3.0) * ufl.Identity(3)
         return ufl.sqrt(1.5 * ufl.inner(s, s) + 1e-30)
 
-    W = fem.functionspace(mesh, ("DG", 0))
+    W = fem.functionspace(mesh, ("Quadrature", vol_quad_degree))
     interp_pts = W.element.interpolation_points
     if callable(interp_pts):
         interp_pts = interp_pts()
     vm_expr = fem.Expression(von_mises_ufl(uh), interp_pts)
     vm_fn = fem.Function(W)
     vm_fn.interpolate(vm_expr)
-    vm_arr_dfx = vm_fn.x.array  # (n_cells,) [Pa], dolfinx cell order
+    # vm_fn.x.array: (n_cells_dfx * n_quads,) in dolfinx cell order, basix quad order
+    n_quads_vm = vm_fn.x.array.shape[0] // n_cells_dfx
+    vm_per_quad_dfx = vm_fn.x.array.reshape(n_cells_dfx, n_quads_vm)  # (n_cells_dfx, n_quads)
 
-    # Permute back to coilforce cell order: vm_cf[c] = vm_dfx[dolfinx_for_coilforce[c]].
-    von_mises_cell = np.asarray(vm_arr_dfx[dolfinx_for_coilforce], dtype=np.float64).copy()
+    # Permute from dolfinx to coilforce cell order and average over Gauss pts.
+    von_mises_cell = np.asarray(
+        vm_per_quad_dfx[dolfinx_for_coilforce].mean(axis=1), dtype=np.float64
+    ).copy()
 
     return {
         "displacement":   displacement,   # (n_nodes, 3) [m]
@@ -1064,7 +1115,8 @@ def _run_dolfinx_pipeline(
             g_vec,
         )  # (n_cells, n_quads, 3)
 
-        # Cell-mean body force for dolfinx DG0 injection
+        # Cell-mean body force — kept for VTU visualization output only.
+        # The dolfinx solve now receives the full per-Gauss-point array.
         f_vol_cell_mean = f_vol_q.mean(axis=1)  # (n_cells, 3)
 
         # Spring stiffness at mesh nodes
@@ -1086,7 +1138,7 @@ def _run_dolfinx_pipeline(
         sol = _dolfinx_solve(
             pts_np,
             cells_np,
-            f_vol_cell_mean,
+            f_vol_q,          # full per-Gauss-point body force (n_cells, n_quads, 3)
             spring_k_nodes_np,
             E,
             nu,
