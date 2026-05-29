@@ -771,6 +771,20 @@ def _dolfinx_solve(
     vol_meta = {"quadrature_degree": vol_quad_degree}
     dx = ufl.dx(metadata=vol_meta)
 
+    # ── Quadrature element (version-safe) ─────────────────────────────────────
+    # basix 0.7+ accepts keyword args; basix 0.6 uses a different positional
+    # signature.  The string shortcut ("Quadrature", n) is only registered in
+    # dolfinx >= 0.9, so we always use basix.ufl.quadrature_element directly.
+    try:
+        _vol_quad_el = basix.ufl.quadrature_element(
+            "tetrahedron", value_shape=(), degree=vol_quad_degree
+        )
+    except TypeError:
+        # basix 0.6 API: quadrature_element(cell, scheme, degree, value_shape)
+        _vol_quad_el = basix.ufl.quadrature_element(
+            "tetrahedron", "default", vol_quad_degree, ()
+        )
+
     # ── Bilinear form ─────────────────────────────────────────────────────────
     a = ufl.inner(sigma(u), ufl.sym(ufl.grad(v))) * dx
 
@@ -798,7 +812,7 @@ def _dolfinx_solve(
     coilforce_for_dolfinx[dolfinx_for_coilforce] = np.arange(n_cells_dfx, dtype=np.intp)
     # Reorder fvol_q from coilforce cell order to dolfinx cell order.
     fvol_q_dfx = fvol_q[coilforce_for_dolfinx]          # (n_cells_dfx, n_quads, 3)
-    QS = fem.functionspace(mesh, ("Quadrature", vol_quad_degree))
+    QS = fem.functionspace(mesh, _vol_quad_el)
     fx_fn = fem.Function(QS); fx_fn.x.array[:] = fvol_q_dfx[:, :, 0].ravel(); fx_fn.x.scatter_forward()
     fy_fn = fem.Function(QS); fy_fn.x.array[:] = fvol_q_dfx[:, :, 1].ravel(); fy_fn.x.scatter_forward()
     fz_fn = fem.Function(QS); fz_fn.x.array[:] = fvol_q_dfx[:, :, 2].ravel(); fz_fn.x.scatter_forward()
@@ -907,7 +921,7 @@ def _dolfinx_solve(
         s   = sig - (ufl.tr(sig) / 3.0) * ufl.Identity(3)
         return ufl.sqrt(1.5 * ufl.inner(s, s) + 1e-30)
 
-    W = fem.functionspace(mesh, ("Quadrature", vol_quad_degree))
+    W = fem.functionspace(mesh, _vol_quad_el)
     interp_pts = W.element.interpolation_points
     if callable(interp_pts):
         interp_pts = interp_pts()
