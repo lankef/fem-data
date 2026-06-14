@@ -15,11 +15,9 @@ from shared import (
     N_QUADPOINTS_LIST,
     load_w7x_data, parse_task_args, get_task_items,
     run_one_n_quadpoints, load_results_from_disk,
+    validate_with_dolfinx,
 )
 
-print("✅ Imports successful")
-print(f"JAX version: {jax.__version__}")
-print(f"JAX devices: {jax.devices()}")
 
 # ── Load W7-X data ────────────────────────────────────────────────────────────
 curves, currents, axis, nfp_w7x, bs = load_w7x_data()
@@ -28,35 +26,23 @@ curves, currents, axis, nfp_w7x, bs = load_w7x_data()
 base_curve_objs   = [curves[0]]
 base_current_objs = [currents[0]]
 
-save_dir = 'w7x_coil_0_bench'
+save_dir = 'w7x_coil_0_data'
 
 # ── Determine which quadpoints this task is responsible for ───────────────────
 task_id, num_tasks = parse_task_args()
 n_quadpoints_i = get_task_items(task_id)
 
-print(f"Task {task_id}/{num_tasks}: running n_quadpoints = {n_quadpoints_i}")
+# print(f"Task {task_id}/{num_tasks}: running n_quadpoints = {n_quadpoints_i}")
+# n_quadpoints_i = 96
 
 # ── Run FEM for each assigned quadpoints value ────────────────────────────────
-result, _, t_jit, t_run = run_one_n_quadpoints(
-    n_quadpoints_i  = n_quadpoints_i,
-    base_curve_objs = base_curve_objs,
-    base_current_objs = base_current_objs,
-    nfp             = 1,      # no field-period symmetry for a single coil
-    stellsym        = False,
-    save_dir        = save_dir,
-    profile=True, solver='jax'
-)
-result, _, t_jit, t_run = run_one_n_quadpoints(
-    n_quadpoints_i  = n_quadpoints_i,
-    base_curve_objs = base_curve_objs,
-    base_current_objs = base_current_objs,
-    nfp             = 1,      # no field-period symmetry for a single coil
-    stellsym        = False,
-    save_dir        = save_dir,
-    profile=True, solver='umfpack'
-)
-print(f"[n={n_quadpoints_i}] Compile + run: {t_jit:.3f}s  |  Run only: {t_run:.3f}s")
-print(f"JAX version: {jax.__version__}")
-print(f"JAX devices: {jax.devices()}")
 
+result, fem, t_jit, t_run = run_one_n_quadpoints(
+    n_quadpoints_i  = n_quadpoints_i,
+    base_curve_objs = base_curve_objs,
+    base_current_objs = base_current_objs,
+    nfp             = 1,      # no field-period symmetry for a single coil
+    stellsym        = False,
+    save_dir        = save_dir,
+)
 

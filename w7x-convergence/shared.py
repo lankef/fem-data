@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-import os
-
-import numpy as np
-
-from coilforce.coil_fem import CoilFEM
-
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -126,7 +121,7 @@ def run_one_n_quadpoints(
     profile=False,
     solver='umfpack',
     run=True
-) -> tuple[dict | None, float, float]:
+) -> tuple[dict | None, 'CoilFEM | None', float, float]:
     """
     Run the FEM solve for *one* quadpoints resolution.
 

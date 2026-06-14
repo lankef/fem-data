@@ -41,7 +41,7 @@ print(f"JAX devices: {jax.devices()}")
 
 
 # ── Run FEM for each assigned quadpoints value ────────────────────────────────
-result, t_jit, t_run = run_one_n_quadpoints(
+result, _, t_jit, t_run = run_one_n_quadpoints(
     n_quadpoints_i    = n_quadpoints_i,
     base_curve_objs   = base_curve_objs,
     base_current_objs = base_current_objs,
