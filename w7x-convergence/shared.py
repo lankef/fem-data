@@ -139,12 +139,12 @@ def run_one_n_quadpoints(
     quadpoints_new = jnp.linspace(0, 1, n_quadpoints_i, endpoint=False)
 
     fem = CoilFEM(
-        base_curves      = [
+        base_curves_jax      = [
             CurveXYZFourierJAX(quadpoints=quadpoints_new,
                                dofs=c.get_dofs(), order=c.order)
             for c in base_curve_objs
         ],
-        base_currents    = [c.current for c in base_current_objs],
+        base_currents_jax    = [c.current for c in base_current_objs],
         nfp              = nfp,
         stellsym         = stellsym,
         mesh_options     = mesh_options,
@@ -311,11 +311,11 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
     from coilforce.curve_jax import CurveXYZFourierJAX
     from coilforce.elasticity import recompute_fe_geometry
 
-    base_curves_dofs = [c.dofs for c in coil_fem.base_curves]
+    base_curves_dofs = [c.dofs for c in coil_fem.base_curves_jax]
     out = []
 
-    for i in range(len(coil_fem.base_curves)):
-        base = coil_fem.base_curves[i]
+    for i in range(len(coil_fem.base_curves_jax)):
+        base = coil_fem.base_curves_jax[i]
         dofs_i = base_curves_dofs[i]
         meta = coil_fem._grid_meta[i]
         prob_i = coil_fem._problems[i]
@@ -391,12 +391,12 @@ def _build_symmetry_sources(
     """
     from coilforce.symmetries import apply_symmetries_to_currents
 
-    n_base  = len(coil_fem.base_curves)
+    n_base  = len(coil_fem.base_curves_jax)
     nfp     = coil_fem.nfp
     stellsym = coil_fem.stellsym
 
     all_currents = np.asarray(
-        apply_symmetries_to_currents(coil_fem.base_currents, nfp, stellsym)
+        apply_symmetries_to_currents(coil_fem.base_currents_jax, nfp, stellsym)
     )  # (n_total,)
 
     sources: list[dict] = []
@@ -553,7 +553,7 @@ def _compute_b_fields_volumetric(
     B_self_list : list[ndarray(n_cells_i, n_q, 3)]  [T]
     B_ext_list  : list[ndarray(n_cells_i, n_q, 3)]  [T]
     """
-    n_base = len(coil_fem.base_curves)
+    n_base = len(coil_fem.base_curves_jax)
     B_self_list: list[np.ndarray] = []
     B_ext_list:  list[np.ndarray] = []
 
@@ -1059,8 +1059,8 @@ def _run_dolfinx_pipeline(
     """
     os.makedirs(out_subdir, exist_ok=True)
 
-    n_base = len(coil_fem.base_curves)
-    base_curves_dofs = [c.dofs for c in coil_fem.base_curves]
+    n_base = len(coil_fem.base_curves_jax)
+    base_curves_dofs = [c.dofs for c in coil_fem.base_curves_jax]
     # _validate_support_dofs(None, n_base) returns [None] * n_base
     support_dofs: list = [None] * n_base
 
@@ -1109,7 +1109,7 @@ def _run_dolfinx_pipeline(
         n_cells = bd["n_cells"]
         n_quads = bd["n_quads"]
         A_i     = bd["A"]
-        I_i     = float(coil_fem.base_currents[i])
+        I_i     = float(coil_fem.base_currents_jax[i])
         dofs_i  = base_curves_dofs[i]
 
         # J at quad points: (I/A) * t_hat_q
@@ -1273,7 +1273,7 @@ def _compare_results(
                     pts=r_pts, centroids=r_c)
 
     rows: list[dict] = []
-    n_base = len(coil_fem.base_curves)
+    n_base = len(coil_fem.base_curves_jax)
 
     for i in range(n_base):
         bd      = base_data[i]
@@ -1448,7 +1448,7 @@ def validate_with_dolfinx(
     print("Expanding to all symmetry images ...")
     sources = _build_symmetry_sources(coil_fem, base_data)
     n_total = len(sources)
-    n_base  = len(coil_fem.base_curves)
+    n_base  = len(coil_fem.base_curves_jax)
     print(
         f"  n_base={n_base}, nfp={coil_fem.nfp}, "
         f"stellsym={coil_fem.stellsym} → n_total={n_total}"
