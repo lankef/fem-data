@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+import time
 from scipy.optimize import minimize
 from simsopt.objectives import SquaredFlux
 from simsopt.objectives.utilities import QuadraticPenalty
@@ -26,7 +27,7 @@ from simsopt.geo import (
 from simsopt.configs import get_data
 from simsopt.geo import plot
 from coilforce.simsopt_bridge    import CoilFEMObjective
-from coilforce.support           import CoilSupport
+from coilforce.support           import CoilSupportDiscrete, CoilSupportTopBottom
 
 # ----- FEM options -----
 
@@ -68,36 +69,43 @@ clamp_radius = 2 * max(mesh_options['w1'], mesh_options['w2'])
 # The "steepness" of the sigmoid function at the edge of the clamp.
 sigmoid_beta  = 20.0 / clamp_radius
 
-class TopBottomSupport(CoilSupport):
-    """Static soft-sphere support at the top and bottom of the coil centreline.
+# Load curves from lists of arrays containing x, y, and z.
+def simsopt_curves_from_xyz(
+    contour_X,
+    contour_Y,
+    contour_Z, 
+    order=None, ppp=20):
+    num_coils = len(contour_X)
+    try:     
+        from simsopt.geo import CurveXYZFourier
+    except:
+        raise ImportError('Simsopt is required to use the coil-cutting features.')
+    # Calculating order
+    if not order:
+        order=float('inf')
+        for i in range(num_coils):
+            xArr = contour_X[i]
+            yArr = contour_Y[i]
+            zArr = contour_Z[i]
+            for x in [xArr, yArr, zArr]:
+                if len(x)//2<order:
+                    order = len(x)//2
+    
+    coils = [CurveXYZFourier(order*ppp, order) for i in range(num_coils)]
+    # Compute the Fourier coefficients for each coil
+    for ic in range(num_coils):
+        xArr = contour_X[ic]
+        yArr = contour_Y[ic]
+        zArr = contour_Z[ic]
 
-    Has no optimisable DOFs (``dofs={}``); ``clamp_radius`` and ``sigmoid_beta``
-    are fixed constants.
-    """
+        # Compute the Fourier coefficients
+        dofs=[]
+        for x in [xArr, yArr, zArr]:
+            dof_i = ifft_simsopt(x, order)
+            dofs.append(dof_i)
 
-    def __init__(self, clamp_radius, sigmoid_beta):
-        super().__init__(
-            dofs={},
-            constants={'clamp_radius': float(clamp_radius),
-                       'sigmoid_beta': float(sigmoid_beta)},
-        )
-
-    @staticmethod
-    def support_fn(surface_points, curve_jax, dofs, *, clamp_radius, sigmoid_beta):
-        gamma  = curve_jax.gamma()                         # (n_quad, 3)
-        top    = gamma[jnp.argmax(gamma[:, 2])]            # (3,) highest point
-        bottom = gamma[jnp.argmin(gamma[:, 2])]            # (3,) lowest point
-
-        # Safe norm: jnp.linalg.norm gradient is NaN at zero distance;
-        # adding eps inside sqrt keeps the backward pass finite.
-        d_top    = jnp.sqrt(jnp.sum((surface_points - top)**2,    axis=-1) + 1e-30)
-        d_bottom = jnp.sqrt(jnp.sum((surface_points - bottom)**2, axis=-1) + 1e-30)
-
-        # sigmoid(beta*(R-d)): ~1 inside sphere of radius clamp_radius, ~0 outside
-        w_top    = jax.nn.sigmoid(sigmoid_beta * (clamp_radius - d_top))
-        w_bottom = jax.nn.sigmoid(sigmoid_beta * (clamp_radius - d_bottom))
-        return jnp.maximum(w_top, w_bottom)   # union of the two spheres
-
+        coils[ic].local_x = np.concatenate(dofs)
+    return coils
 
 # ----- Loading coils -----
 
@@ -108,6 +116,11 @@ base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
 # ----- Loading equilibrium -----
+
+n_phi = 25        # half fp like in virtual casing convention
+n_theta = 50
+vc_src_nphi = 40  # half fp like in virtual casing convention
+vc_src_ntheta = 80
 
 def load_eq(file_name):
     eq = Vmec(file_name, keep_all_files=True)
@@ -130,13 +143,6 @@ def load_eq(file_name):
     return eq, Bnormal_plasma, plasma_surface_vc, vc
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
-
-# ----- Virtual casing resolution ----
-
-n_phi = 25        # half fp like in virtual casing convention
-n_theta = 50
-vc_src_nphi = 40  # half fp like in virtual casing convention
-vc_src_ntheta = 80
 
 # ----- Loading constant parameters -----
 # Setting targets
@@ -176,10 +182,30 @@ FLUX_NORM_TARGET = 5e-4
 MAXITER = 5
 STRESS_WEIGHT = 1e-10
 
+
+def increase_base_curve_order(base_curves, coils_per_half_field_period, increment):
+    order_in = base_curves[0].order
+    contour_X = []
+    contour_Y = []
+    contour_Z = []
+    for curve_i in base_curves:
+        gamma_i = curve_i.gamma()
+        contour_X.append(gamma_i[:, 0])
+        contour_Y.append(gamma_i[:, 1])
+        contour_Z.append(gamma_i[:, 2])
+    base_curves_out = simsopt_curves_from_xyz(
+        contour_X,
+        contour_Y,
+        contour_Z,
+        order=order_in + increment,
+        ppp=20,
+    )
+    return base_curves_out
 def run_filament_free(
         base_curves, base_currents, 
         plasma_surface, Bnormal_plasma, 
-        MAXITER, force_mode
+        MAXITER, force_mode,
+        support_type, support_kwargs
     ):
 
     # --------------------------------------
@@ -230,9 +256,9 @@ def run_filament_free(
         Jstress = CoilFEMObjective(
             base_curves      = base_curves,
             base_currents    = base_currents,
-            base_supports    = [TopBottomSupport(clamp_radius, sigmoid_beta)
+            base_supports    = [support_type(**support_kwargs)
                                 for _ in base_curves],
-            metrics          = ('soft_max_von_mises',),
+            metrics          = ('lse_max_von_mises',),
             metric_weights   = (1.,),
             nfp              = plasma_surface.nfp,
             stellsym         = plasma_surface.stellsym,
@@ -298,7 +324,10 @@ def run_filament_free(
     filament_time = time_filament_2 - time_filament_1
     print('Filament time', filament_time)
     print('Normalized flux', Jf_norm.J())
-    print('L2 force', Jforce.J())
+    if force_mode:
+        print('L2 force', Jforce.J())
+    else:
+        print('Max (lse) von mises', Jstress.J())
     print('Lengths', [j.J() for j in Jls])
     print('Max curvatures', [jnp.max(jnp.abs(c.kappa())) for c in base_curves])
     print('Final value of terms')
@@ -312,18 +341,21 @@ def run_filament_free(
     print('    + CURVATURE_WEIGHT * sum(Jcs) ', CURVATURE_WEIGHT * sum(Jcs).J())
     print('    + LINK_WEIGHT * linkNum       ', LINK_WEIGHT * linkNum.J())
     print('    + LENGTH_WEIGHT * sum(Jls)    ', (LENGTH_WEIGHT * sum(Jls)).J())
-return (
-    coils,
-    curves_for_ccd,
-    res,
-    filament_time,
-    Jf_norm,
-    Jf_actual,
-    Jccdist,
-    Jccdist_actual,
-    Jcsdist,
-    Jcsdist_actual,
-    Jforce,
-    Jls,
-    linkNum,
-)
+    if force_mode:
+        return (
+            coils, curves_for_ccd, res, filament_time,
+            Jf_norm, Jf_actual, 
+            Jccdist, Jccdist_actual,
+            Jcsdist, Jcsdist_actual,
+            Jforce,
+            Jls, linkNum,
+        )
+    else:
+        return (
+            coils, curves_for_ccd, res, filament_time,
+            Jf_norm, Jf_actual, 
+            Jccdist, Jccdist_actual,
+            Jcsdist, Jcsdist_actual,
+            Jstress,
+            Jls, linkNum,
+        )
