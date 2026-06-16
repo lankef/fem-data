@@ -149,8 +149,8 @@ def run_one_n_quadpoints(
         stellsym         = stellsym,
         mesh_options     = mesh_options,
         material_options = material_options_const_temp,
-        support_fn       = support_fn,
-        support_dofs     = support_dofs,
+        base_support_fns = support_fn,
+        base_support_dofs = support_dofs,
         problem_options  = problem_options|{'solver':solver, 'adjoint_solver':solver},
     )
     fem.save_support_vtu(str(out_dir), prefix="coil_")
@@ -957,7 +957,7 @@ def _spring_k_node_array(
     -------
     np.ndarray, (n_nodes,) [N/m³]
     """
-    if coil_fem.support_fn is None:
+    if not coil_fem.base_support_fns:
         return np.zeros(pts_i.shape[0], dtype=np.float64)
 
     winkler_k = float(coil_fem.problem_options["winkler_k"])
@@ -1136,7 +1136,7 @@ def _run_dolfinx_pipeline(
         spring_k_nodes_np = np.asarray(spring_k_nodes)
 
         # Support weights (unscaled) for VTU output
-        if coil_fem.support_fn is not None:
+        if coil_fem.base_support_fns:
             winkler_k   = float(coil_fem.problem_options["winkler_k"])
             support_weights_np = spring_k_nodes_np / (winkler_k + 1e-300)
         else:
@@ -1427,10 +1427,10 @@ def validate_with_dolfinx(
     """
     _require_dolfinx()
 
-    if coil_fem.support_fn is None:
+    if not coil_fem.base_support_fns:
         import warnings
         warnings.warn(
-            "CoilFEM has support_fn=None — no Winkler BC will be applied in "
+            "CoilFEM has no support functions — no Winkler BC will be applied in "
             "dolfinx.  The system may be singular unless the body force alone "
             "determines the deformation uniquely (e.g. self-equilibrated load).  "
             "If JAX-FEM uses Dirichlet BCs you must add them here manually.",
