@@ -7,6 +7,8 @@ from optimization import (
 # Loading config from simsopt
 from simsopt.configs import get_data
 from simsopt.geo import plot
+from coilforce.support import CoilSupportDiscrete, CoilSupportTopBottom
+from simsopt import save
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
 curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_period=4)
@@ -33,12 +35,15 @@ logging.getLogger('jax_fem').setLevel(logging.WARNING)
     plasma_surface=plasma_surface_vc, 
     Bnormal_plasma=Bnormal_plasma, 
     MAXITER=1000, 
-    force_mode=True,
-    support_type=None, 
-    support_kwargs={}
+    force_mode=False,
+    support_type=CoilSupportTopBottom, 
+    support_kwargs={
+        'clamp_radius': 0.3,
+        'sigmoid_beta': 1/(0.3/5),
+    }
 )
 
-
+save(coils, filename='coils_fixed.json')
 save(
     {
         'coils': coils,
@@ -48,8 +53,7 @@ save(
         'Jccdist_actual': Jccdist_actual,
         'Jcsdist': Jcsdist,
         'Jcsdist_actual': Jcsdist_actual,
-        'Jstress': Jstress,
         'Jls': Jls,
     },
-    filename='force.json'
+    filename='fixed.json'
 )

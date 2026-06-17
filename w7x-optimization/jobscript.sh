@@ -1,13 +1,14 @@
 #!/bin/bash -l
+#SBATCH --account=torch_pr_292_courant
 #SBATCH --cpus-per-task=4
 #SBATCH --time=20:00:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
-#SBATCH --mem=20G
-#SBATCH --array=0-2                       # 3 tasks: indices 0,1,2
+#SBATCH --mem=200G
+#SBATCH --array=0,2                       # 3 tasks: indices 0,1,2
 
 # Pick the script for this array index
-SCRIPTS=(fixed.py force.py movable.py)
+SCRIPTS=(optimize_fixed.py optimize_force.py optimize_movable.py)
 SCRIPT=${SCRIPTS[$SLURM_ARRAY_TASK_ID]}
 
 module load anaconda3/2025.06
