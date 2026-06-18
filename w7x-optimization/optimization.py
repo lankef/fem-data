@@ -341,6 +341,8 @@ def run_filament_free(
     print('    + CURVATURE_WEIGHT * sum(Jcs) ', CURVATURE_WEIGHT * sum(Jcs).J())
     print('    + LINK_WEIGHT * linkNum       ', LINK_WEIGHT * linkNum.J())
     print('    + LENGTH_WEIGHT * sum(Jls)    ', (LENGTH_WEIGHT * sum(Jls)).J())
+    print('-----------------------------------------')
+    print('res', res)
     if force_mode:
         return (
             coils, curves_for_ccd, res, filament_time,
