@@ -62,13 +62,6 @@ material_options_variable_temp = dict(
     final_temperature = 4.0,      # superconducting service temperature [K]
 ) | material_options_const_temp
 
-# Set the size of the support clamp (in other words, the region
-# with non-zero Winkler spring coefficients).
-# Clamp radius = 2 × coil half-width; sigmoid sharpness tuned to clamp_radius.
-clamp_radius = 2 * max(mesh_options['w1'], mesh_options['w2'])
-# The "steepness" of the sigmoid function at the edge of the clamp.
-sigmoid_beta  = 20.0 / clamp_radius
-
 # Load curves from lists of arrays containing x, y, and z.
 def simsopt_curves_from_xyz(
     contour_X,
@@ -180,7 +173,7 @@ CS_WEIGHT = 100
 LENGTH_WEIGHT = 200
 FLUX_NORM_TARGET = 5e-4
 MAXITER = 5
-STRESS_WEIGHT = 1e-10
+STRESS_WEIGHT = 1e-18
 
 
 def increase_base_curve_order(base_curves, coils_per_half_field_period, increment):
@@ -208,6 +201,8 @@ def run_filament_free(
         support_type, support_kwargs
     ):
 
+    import logging
+    logging.getLogger('jax_fem').setLevel(logging.WARNING)
     # --------------------------------------
     coils = coils_via_symmetries(base_curves, base_currents, plasma_surface.nfp, True)
 
@@ -237,7 +232,7 @@ def run_filament_free(
         QuadraticPenalty(
             CurveLength(c),
             CurveLength(c).J(),
-            "max",
+            "max", 
         ) for c in base_curves
     ]
     print('Initial lengths', [CurveLength(c).J() for c in base_curves])
@@ -258,7 +253,7 @@ def run_filament_free(
             base_currents    = base_currents,
             base_supports    = [support_type(**support_kwargs)
                                 for _ in base_curves],
-            metrics          = ('lse_max_von_mises',),
+            metrics          = ('l2_von_mises',),
             metric_weights   = (1.,),
             nfp              = plasma_surface.nfp,
             stellsym         = plasma_surface.stellsym,

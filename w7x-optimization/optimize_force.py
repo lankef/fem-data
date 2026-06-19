@@ -7,7 +7,10 @@ from optimization import (
 # Loading config from simsopt
 from simsopt.configs import get_data
 from simsopt.geo import plot
+
 from simsopt import save
+import time
+import numpy as np
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
 curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_period=4)
@@ -21,6 +24,7 @@ stellsym = True
 import logging
 logging.getLogger('jax_fem').setLevel(logging.WARNING)
 
+time1 = time.time()
 (
     coils, curves_for_ccd, res, filament_time,
     Jf_norm, Jf_actual, 
@@ -38,8 +42,11 @@ logging.getLogger('jax_fem').setLevel(logging.WARNING)
     support_type=None, 
     support_kwargs={}
 )
-
-
+time2 = time.time()
+np.save('misc_force', {
+    'nit': res.nit,
+    'time': time2-time1, 
+})
 save(coils, filename='coils_force.json')
 save(
     {
@@ -52,5 +59,6 @@ save(
         'Jcsdist_actual': Jcsdist_actual,
         'Jls': Jls,
     },
-    filename='force.json'
+    filename='data_force.json'
 )
+save([Jstress], 'Jstress_force.json')

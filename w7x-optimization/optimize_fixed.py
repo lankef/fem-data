@@ -9,6 +9,8 @@ from simsopt.configs import get_data
 from simsopt.geo import plot
 from coilforce.support import CoilSupportDiscrete, CoilSupportTopBottom
 from simsopt import save
+import time
+import numpy as np
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
 curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_period=4)
@@ -22,6 +24,7 @@ stellsym = True
 import logging
 logging.getLogger('jax_fem').setLevel(logging.WARNING)
 
+time1 = time.time()
 (
     coils, curves_for_ccd, res, filament_time,
     Jf_norm, Jf_actual, 
@@ -39,10 +42,13 @@ logging.getLogger('jax_fem').setLevel(logging.WARNING)
     support_type=CoilSupportTopBottom, 
     support_kwargs={
         'clamp_radius': 0.3,
-        'sigmoid_beta': 1/(0.3/5),
     }
 )
-
+time2 = time.time()
+np.save('misc_fixed', {
+    'nit': res.nit,
+    'time': time2-time1, 
+})
 save(coils, filename='coils_fixed.json')
 save(
     {
@@ -55,5 +61,6 @@ save(
         'Jcsdist_actual': Jcsdist_actual,
         'Jls': Jls,
     },
-    filename='fixed.json'
+    filename='data_fixed.json'
 )
+save([Jstress], 'Jstress_fixed.json')
