@@ -119,7 +119,7 @@ def run_one_n_quadpoints(
     stellsym: bool,
     save_dir: str,
     profile=False,
-    solver='umfpack',
+    solver='cudss',
     run=True
 ) -> tuple[dict | None, 'CoilFEM | None', float, float]:
     """
