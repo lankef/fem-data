@@ -5,7 +5,7 @@
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
 #SBATCH --mem=200G
-#SBATCH --array=0,2                       # 3 tasks: indices 0,1,2
+#SBATCH --array=0-2                       # 3 tasks: indices 0,1,2
 
 # Pick the script for this array index
 SCRIPTS=(optimize_fixed.py optimize_force.py optimize_movable.py)

@@ -13,7 +13,7 @@ import time
 import numpy as np
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
-curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_period=4)
+curves, currents, axis, nfp, bs = get_data('w7x', coil_order=10, points_per_period=4)
 
 # list of CurveXYZFourierJAX, one per *base* coil (before symmetry expansion)
 base_curves = curves[:5]
@@ -37,7 +37,7 @@ time1 = time.time()
     base_currents=base_currents, 
     plasma_surface=plasma_surface_vc, 
     Bnormal_plasma=Bnormal_plasma, 
-    MAXITER=1000, 
+    MAXITER=500, 
     force_mode=False,
     support_type=CoilSupportTopBottom, 
     support_kwargs={
