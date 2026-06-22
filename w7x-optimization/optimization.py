@@ -45,8 +45,8 @@ mesh_options = dict(
 # Winkler BC and linear-solver settings.
 problem_options = dict(
     winkler_k      = 1e10,      # Winkler spring stiffness [N/m³]
-    solver         = 'umfpack', # A CPU sparse solver. Future version 
-    adjoint_solver = 'umfpack', # will support cuSparse GPU sparse solvers.
+    solver         = 'cudss', # A CPU sparse solver. Future version 
+    adjoint_solver = 'cudss', # will support cuSparse GPU sparse solvers.
 )
 
 # Material settings

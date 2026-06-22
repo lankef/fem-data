@@ -4,11 +4,12 @@
 #SBATCH --time=20:00:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
-#SBATCH --mem=200G
-#SBATCH --array=0-2                       # 3 tasks: indices 0,1,2
+#SBATCH --mem=50G
+#SBATCH --gres=gpu:l40s:1
+#SBATCH --array=0-3                       # 3 tasks: indices 0,1,2
 
 # Pick the script for this array index
-SCRIPTS=(optimize_fixed.py optimize_force.py optimize_movable.py)
+SCRIPTS=(optimize_fixed.py optimize_force.py optimize_movable.py optimize_support.py)
 SCRIPT=${SCRIPTS[$SLURM_ARRAY_TASK_ID]}
 
 module load anaconda3/2025.06
