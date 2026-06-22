@@ -1,10 +1,10 @@
 #!/bin/bash -l
 #SBATCH --account=torch_pr_292_courant
 #SBATCH --cpus-per-task=4
-#SBATCH --time=10:00:00
+#SBATCH --time=2:00:00
 #SBATCH --output=w7x_coil_0_logs/slurm_%A_%a.out   # stdout log (%A=job id, %a=array index)
 #SBATCH --error=w7x_coil_0_logs/slurm_%A_%a.err    # stderr log
-###SBATCH --gres=gpu:1             # one GPU per task
+#SBATCH --gres=gpu:l40s:1
 
 # Create w7x_coil_0_logs directory if it doesn't exist
 mkdir -p w7x_coil_0_logs
