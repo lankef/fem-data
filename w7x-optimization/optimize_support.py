@@ -26,7 +26,7 @@ logging.getLogger('jax_fem').setLevel(logging.WARNING)
 
 # Fixing all curves
 for c in base_curves:
-    c.fixall()
+    c.fix_all()
     
 time1 = time.time()
 (
