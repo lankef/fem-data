@@ -1,0 +1,6 @@
+[gl027.hpc.nyu.edu:2843820] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+Traceback (most recent call last):
+  File "/scratch/lf2869/project/fem-data/w7x-optimization/./optimize_support.py", line 29, in <module>
+    c.fixall()
+    ^^^^^^^^
+AttributeError: 'CurveXYZFourier' object has no attribute 'fixall'. Did you mean: 'fix_all'?

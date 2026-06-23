@@ -1,0 +1,43 @@
+Btarget should have shape (25, 50)
+Btarget has shape (25, 50)
+Initial normalized flux 5.435032925837685e-07
+Setting normalized flux target to this value.
+Initial lengths [Array(8.54929691, dtype=float64), Array(8.47945104, dtype=float64), Array(8.45876912, dtype=float64), Array(8.55374111, dtype=float64), Array(8.50500782, dtype=float64)]
+Setting length targets to these values.
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+Optimizing max Von Mises
+Begin ----------
+MAXITER = 500
+solving with float64
+solving with float64
+Filament time 3314.2087836265564
+Normalized flux 6.928120181902721e-06
+Max (lse) von mises 1.8028400721622502e+17
+Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0)]
+Max curvatures [Array(2.55083, dtype=float64), Array(2.5574, dtype=float64), Array(2.55584, dtype=float64), Array(2.54466, dtype=float64), Array(2.2165, dtype=float64)]
+Final value of terms
+    FLUX_WEIGHT**2 * Jf_norm_cons  0.002038166641168841
+    + CC_WEIGHT * Jccdist          0.0
+    + CS_WEIGHT * Jcsdist          0.0
+    + STRESS_WEIGHT * Jstress      0.18028400721622503
+    + CURVATURE_WEIGHT * sum(Jcs)  0.0001235233215154015
+    + LINK_WEIGHT * linkNum        0
+    + LENGTH_WEIGHT * sum(Jls)     0.0
+-----------------------------------------
+res   message: CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH
+  success: True
+   status: 0
+      fun: 0.1824456971783985
+        x: [ 1.620e+06  5.415e+00 ... -9.665e-04 -4.117e-03]
+      nit: 26
+      jac: [ 4.451e-07 -7.789e-02 ...  3.374e+00 -2.059e+00]
+     nfev: 235
+     njev: 235
+ hess_inv: <316x316 LbfgsInvHessProduct with dtype=float64>
