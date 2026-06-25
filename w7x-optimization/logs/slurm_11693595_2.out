@@ -1,8 +1,8 @@
 Btarget should have shape (25, 50)
 Btarget has shape (25, 50)
-Initial normalized flux 5.435032925837685e-07
+Initial normalized flux 5.435342747760341e-07
 Setting normalized flux target to this value.
-Initial lengths [Array(8.54929691, dtype=float64), Array(8.47945104, dtype=float64), Array(8.45876912, dtype=float64), Array(8.55374111, dtype=float64), Array(8.50500782, dtype=float64)]
+Initial lengths [Array(8.54929644, dtype=float64), Array(8.47945083, dtype=float64), Array(8.45877022, dtype=float64), Array(8.55373924, dtype=float64), Array(8.50500945, dtype=float64)]
 Setting length targets to these values.
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
@@ -17,27 +17,27 @@ Begin ----------
 MAXITER = 500
 solving with float64
 solving with float64
-Filament time 13734.322315692902
-Normalized flux 8.662957205464315e-07
-Max (lse) von mises 3.8433076392593224e+16
-Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(2.386931620929061e-09)]
-Max curvatures [Array(2.55132, dtype=float64), Array(2.55553, dtype=float64), Array(2.5519, dtype=float64), Array(2.55504, dtype=float64), Array(2.55205, dtype=float64)]
+Filament time 13064.945180416107
+Normalized flux 7.894684398323379e-07
+Max (lse) von mises 3.28325265406674e+16
+Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0)]
+Max curvatures [Array(2.55356, dtype=float64), Array(2.5525, dtype=float64), Array(2.55206, dtype=float64), Array(2.55463, dtype=float64), Array(2.55366, dtype=float64)]
 Final value of terms
-    FLUX_WEIGHT**2 * Jf_norm_cons  0.0020838990310006232
-    + CC_WEIGHT * Jccdist          6.67571387627853e-07
+    FLUX_WEIGHT**2 * Jf_norm_cons  0.0012096722708388264
+    + CC_WEIGHT * Jccdist          5.03074784592298e-06
     + CS_WEIGHT * Jcsdist          0.0
-    + STRESS_WEIGHT * Jstress      0.038433076392593225
-    + CURVATURE_WEIGHT * sum(Jcs)  9.801171692678524e-07
+    + STRESS_WEIGHT * Jstress      0.0328325265406674
+    + CURVATURE_WEIGHT * sum(Jcs)  0.0
     + LINK_WEIGHT * linkNum        0
-    + LENGTH_WEIGHT * sum(Jls)     4.773863241858123e-07
+    + LENGTH_WEIGHT * sum(Jls)     0.0
 -----------------------------------------
 res   message: STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
   success: False
    status: 1
-      fun: 0.040519100498479836
-        x: [ 8.011e-04  5.016e-01 ... -5.011e-03 -1.182e-02]
+      fun: 0.03404722955931352
+        x: [-6.471e-04  5.215e-01 ...  1.131e-03 -1.103e-02]
       nit: 500
-      jac: [-1.118e-03  3.069e-02 ... -3.245e-01 -1.754e-01]
-     nfev: 1488
-     njev: 1488
+      jac: [-8.302e-04 -3.227e-03 ... -2.439e-03 -1.676e-03]
+     nfev: 1105
+     njev: 1105
  hess_inv: <326x326 LbfgsInvHessProduct with dtype=float64>

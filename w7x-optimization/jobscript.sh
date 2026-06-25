@@ -6,7 +6,7 @@
 #SBATCH --error=logs/slurm_%A_%a.err
 #SBATCH --mem=50G
 #SBATCH --gres=gpu:l40s:1
-#SBATCH --array=0-2                       # 4 tasks
+#SBATCH --array=0-3                       # 4 tasks
 
 # Pick the script for this array index
 SCRIPTS=(optimize_fixed.py optimize_force.py optimize_movable.py optimize_support.py)

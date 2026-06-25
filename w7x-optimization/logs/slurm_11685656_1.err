@@ -1,0 +1,16 @@
+[gl035.hpc.nyu.edu:346699] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+Traceback (most recent call last):
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/_lib/_util.py", line 1091, in __getattr__
+    return self[name]
+           ~~~~^^^^^^
+KeyError: 'jfev'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/scratch/lf2869/project/fem-data/w7x-optimization/./optimize_force.py", line 49, in <module>
+    'njev': res.jfev,
+            ^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/_lib/_util.py", line 1093, in __getattr__
+    raise AttributeError(name) from e
+AttributeError: jfev. Did you mean: 'nfev'?

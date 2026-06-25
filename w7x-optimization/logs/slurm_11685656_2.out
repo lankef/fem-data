@@ -1,0 +1,19 @@
+Btarget should have shape (25, 50)
+Btarget has shape (25, 50)
+Initial normalized flux 5.435342747760342e-07
+Setting normalized flux target to this value.
+Initial lengths [Array(8.54929644, dtype=float64), Array(8.47945083, dtype=float64), Array(8.45877022, dtype=float64), Array(8.55373924, dtype=float64), Array(8.50500945, dtype=float64)]
+Setting length targets to these values.
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+Optimizing max Von Mises
+Begin ----------
+MAXITER = 500
+solving with float64
+solving with float64
