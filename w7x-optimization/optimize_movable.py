@@ -13,7 +13,7 @@ import time
 import numpy as np
 
 eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
-curves, currents, axis, nfp, bs = get_data('w7x', coil_order=10, points_per_period=4)
+curves, currents, axis, nfp, bs = get_data('w7x', coil_order=10, points_per_period=8)
 
 # list of CurveXYZFourierJAX, one per *base* coil (before symmetry expansion)
 base_curves = curves[:5]
@@ -48,6 +48,7 @@ time1 = time.time()
 time2 = time.time()
 np.save('misc_movable', {
     'nit': res.nit,
+    'nfev': res.nfev,
     'time': time2-time1, 
 })
 
