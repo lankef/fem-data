@@ -688,15 +688,38 @@ def _dolfinx_solve(
     fem_degree = 2 if is_tet10 else 1
 
     # ── Build dolfinx mesh ────────────────────────────────────────────────────
-    # Always build a degree-1 (straight-sided) geometric mesh.  For TET10,
-    # pass only the 4 corner columns; dolfinx ignores any unreferenced nodes
-    # in pts_np (the midpoint rows).
+    # TET4  → degree-1 straight-sided geometry (4 corner nodes / cell).
+    # TET10 → degree-2 ISOPARAMETRIC (curved-sided) geometry using all 10 nodes,
+    #         so the dolfinx geometry matches coilforce's curved TET10 elements.
+    #         The curved-edge mesh update moved the midside nodes off the
+    #         straight chord midpoints; coilforce's JAX-FEM solve uses those
+    #         positions in its isoparametric element map, so a straight
+    #         P2-on-degree-1 reference would solve a slightly different
+    #         (chord-sided) problem and would also break the P2 DOF coordinate
+    #         matching below (dolfinx would place edge DOFs at chord midpoints).
+    #
+    # coilforce/meshio store TET10 connectivity in VTK ordering, but dolfinx
+    # `create_mesh` expects basix/DefElement ordering.  `perm_vtk` maps
+    # VTK → dolfinx via  a_dolfin[i] = a_vtk[p[i]]  (i.e. cells[:, p]).
     corner_cells = cells_np[:, :4] if is_tet10 else cells_np
-    el_def = basix.ufl.element("Lagrange", "tetrahedron", 1, shape=(3,))
+    geo_degree = 2 if is_tet10 else 1
+    el_def = basix.ufl.element("Lagrange", "tetrahedron", geo_degree, shape=(3,))
     ufl_domain = ufl.Mesh(el_def)
+    if is_tet10:
+        from dolfinx.mesh import CellType as _CellType
+        try:                                       # dolfinx >= ~0.8
+            from dolfinx.io.utils import cell_perm_vtk as _perm_vtk
+        except ImportError:                        # older builds expose it on cpp
+            from dolfinx.cpp.io import perm_vtk as _perm_vtk
+        vtk_to_dolfinx = np.asarray(
+            _perm_vtk(_CellType.tetrahedron, 10), dtype=np.int32
+        )
+        cells_in = cells_np[:, vtk_to_dolfinx].astype(np.int64)
+    else:
+        cells_in = cells_np.astype(np.int64)
     mesh = dfx_mesh.create_mesh(
         MPI.COMM_WORLD,
-        corner_cells.astype(np.int64),
+        cells_in,
         e=ufl_domain,
         x=pts_np.astype(np.float64),
     )
@@ -708,25 +731,34 @@ def _dolfinx_solve(
     # below.  Required for:
     #   * Injecting cell-mean body force into DG0 functions in the right slot.
     #   * Returning von Mises (DG0) in coilforce cell order to the caller.
-    # Note: mean of all TET10 nodes equals the corner-node centroid (algebraic
-    # identity), so pts_np[cells_np].mean(axis=1) is correct for both TET4/10.
+    # `compute_midpoints` averages each cell's *vertex* (corner) geometry nodes
+    # (its source assumes a linear geometry), so it returns the corner centroid
+    # even for the degree-2 isoparametric mesh.  For curved TET10 the mean of
+    # all 10 nodes no longer equals the corner centroid, so match against the
+    # corner-only centroid.  As a guard against dolfinx versions that average
+    # all geometry nodes instead, fall back to the all-node centroid.
     tdim = mesh.topology.dim
     n_cells_dfx = mesh.topology.index_map(tdim).size_local
     cell_idx_dfx = np.arange(n_cells_dfx, dtype=np.int32)
     cent_dfx = dfx_mesh.compute_midpoints(mesh, tdim, cell_idx_dfx)
-    cent_cf  = pts_np[cells_np].mean(axis=1)
-    if cent_dfx.shape[0] != cent_cf.shape[0]:
+    if cent_dfx.shape[0] != cells_np.shape[0]:
         raise RuntimeError(
             f"Cell count mismatch: dolfinx={cent_dfx.shape[0]}, "
-            f"coilforce={cent_cf.shape[0]}.  Did dolfinx drop cells?"
+            f"coilforce={cells_np.shape[0]}.  Did dolfinx drop cells?"
         )
-    tree_cell = cKDTree(cent_dfx)
-    dist_c, dolfinx_for_coilforce = tree_cell.query(cent_cf)  # (n_cells,)
     tol = 1e-8 * (np.abs(pts_np).max() + 1.0)
-    if np.max(dist_c) > tol:
+    tree_cell = cKDTree(cent_dfx)
+    best = None
+    for cent_cf in (pts_np[corner_cells].mean(axis=1),   # corner centroid
+                    pts_np[cells_np].mean(axis=1)):       # all-node centroid
+        dist_c, mapping = tree_cell.query(cent_cf)        # (n_cells,)
+        if best is None or np.max(dist_c) < best[0]:
+            best = (np.max(dist_c), mapping)
+    dist_c_max, dolfinx_for_coilforce = best
+    if dist_c_max > tol:
         raise RuntimeError(
             f"Cell centroid match failed (max distance "
-            f"{np.max(dist_c):.3e} m > tol {tol:.3e}).  Dolfinx mesh may "
+            f"{dist_c_max:.3e} m > tol {tol:.3e}).  Dolfinx mesh may "
             "differ from input topology."
         )
     if len(np.unique(dolfinx_for_coilforce)) != n_cells_dfx:

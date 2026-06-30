@@ -44,7 +44,7 @@ mesh_options = dict(
 
 # Winkler BC and linear-solver settings.
 problem_options = dict(
-    winkler_k      = 1e10,      # Winkler spring stiffness [N/m³]
+    winkler_k      = 1e10,    # Winkler spring stiffness [N/m³]
     solver         = 'cudss', # A CPU sparse solver. Future version 
     adjoint_solver = 'cudss', # will support cuSparse GPU sparse solvers.
 )
@@ -53,7 +53,7 @@ problem_options = dict(
 material_options_const_temp = dict(
     E       = 200e9,   # Young's modulus [Pa]
     nu      = 0.30,    # Poisson ratio
-    density = 7800.0,  # mass density [kg m⁻³]
+    density = 7800.0,  # mass density [kg/m³]
 )
 
 material_options_variable_temp = dict(
