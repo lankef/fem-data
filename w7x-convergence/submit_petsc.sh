@@ -2,7 +2,6 @@
 NUM_TASKS=8
 mkdir -p w7x_coil_0_petsc_logs
 mkdir -p w7x_coil_0_data_petsc
-mkdir -p w7x_coil_0_petsc_dolfinx
 for TASK_ID in $(seq 0 $((NUM_TASKS - 1))); do
     MEM_GB=$(awk "BEGIN {printf \"%d\", 20 + ($TASK_ID * 0.57)^3 / 100 * 120}")
     echo "Task $TASK_ID: ${MEM_GB}G"
