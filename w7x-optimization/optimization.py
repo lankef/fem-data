@@ -1,6 +1,8 @@
+import json
 import numpy as np
 import jax.numpy as jnp
 import time
+from pathlib import Path
 from scipy.optimize import minimize
 from simsopt.objectives import SquaredFlux
 from simsopt.objectives.utilities import QuadraticPenalty
@@ -50,17 +52,43 @@ problem_options = dict(
 )
 
 # Material settings
-material_options_const_temp = dict(
-    E       = 200e9,   # Young's modulus [Pa]
-    nu      = 0.30,    # Poisson ratio
-    density = 7800.0,  # mass density [kg/m³]
+# ─────────────────────────────────────────────────────────────────────────────
+# Material, thermal-contraction and gravity parameters are centralised in
+# ``fem-data/properties.json`` (repo root) and loaded here so every script uses
+# the same values + literature references.  W7-X coil casings / support
+# structure are AISI 316LN austenitic stainless steel; values (E, nu, density,
+# 293→4 K shrinkage) are from Foussat et al. 2013 (see properties.json).
+# To disable thermal or gravity, edit properties.json (set gravity.enabled=false
+# or drop the shrinkage key); no code changes needed.
+# ─────────────────────────────────────────────────────────────────────────────
+_PROPERTIES_PATH = Path(__file__).resolve().parent.parent / 'properties.json'
+with open(_PROPERTIES_PATH) as _f:
+    _PROPERTIES = json.load(_f)
+
+_mat = _PROPERTIES['material']
+_grav = _PROPERTIES.get('gravity', {})
+
+# Elastic + thermal material options forwarded to CoilFEMObjective.
+material_options = dict(
+    E         = float(_mat['E_Pa']),
+    nu        = float(_mat['nu']),
+    density   = float(_mat['density_kg_m3']),
+    shrinkage = float(_mat['shrinkage']),   # linear contraction ΔL/L; eps_th = -shrinkage·I
 )
 
-material_options_variable_temp = dict(
-    alpha             = 16.5e-6,  # CTE for 316 LN stainless steel [1/K]
-    init_temperature  = 293.15,   # stress-free reference temperature [K]
-    final_temperature = 4.0,      # superconducting service temperature [K]
-) | material_options_const_temp
+# Gravity body-force options (None disables the gravity load).
+if _grav.get('enabled', False):
+    gravity_options = dict(
+        density = float(_mat['density_kg_m3']),
+        g_vec   = tuple(float(c) for c in _grav['g_vec_m_s2']),
+    )
+else:
+    gravity_options = None
+
+# Backward-compatible aliases: existing notebooks import these names.  Both now
+# point at the single JSON-sourced dict (thermal shrinkage included).
+material_options_const_temp = material_options
+material_options_variable_temp = material_options
 
 # Load curves from lists of arrays containing x, y, and z.
 def simsopt_curves_from_xyz(
@@ -258,7 +286,8 @@ def run_filament_free(
             nfp              = plasma_surface.nfp,
             stellsym         = plasma_surface.stellsym,
             mesh_options     = mesh_options,
-            material_options = material_options_const_temp,
+            material_options = material_options,
+            gravity_options  = gravity_options,
             problem_options  = problem_options,
         )
         print('Optimizing max Von Mises')

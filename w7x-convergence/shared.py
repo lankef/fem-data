@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import time
 from pathlib import Path
@@ -41,17 +42,38 @@ problem_options = dict(
     # adjoint_solver = 'jax',
 )
 
-material_options_const_temp = dict(
-    E       = 200e9,   # Young's modulus [Pa]
-    nu      = 0.30,    # Poisson ratio
-    density = 7800.0,  # mass density [kg m⁻³]
+# ─────────────────────────────────────────────────────────────────────────────
+# Material, thermal-contraction and gravity parameters are centralised in
+# ``fem-data/properties.json`` (repo root) and loaded here so every script uses
+# the same values + literature references.  W7-X coil casings / support
+# structure are AISI 316LN austenitic stainless steel; values (E, nu, density,
+# 293→4 K shrinkage) are from Foussat et al. 2013 (see properties.json).
+# To disable thermal or gravity, edit properties.json (set gravity.enabled=false
+# or drop the shrinkage key); no code changes needed.
+# ─────────────────────────────────────────────────────────────────────────────
+_PROPERTIES_PATH = Path(__file__).resolve().parent.parent / 'properties.json'
+with open(_PROPERTIES_PATH) as _f:
+    _PROPERTIES = json.load(_f)
+
+_mat = _PROPERTIES['material']
+_grav = _PROPERTIES.get('gravity', {})
+
+# Elastic + thermal material options forwarded to CoilFEM.
+material_options = dict(
+    E         = float(_mat['E_Pa']),
+    nu        = float(_mat['nu']),
+    density   = float(_mat['density_kg_m3']),
+    shrinkage = float(_mat['shrinkage']),   # linear contraction ΔL/L; eps_th = -shrinkage·I
 )
 
-material_options_variable_temp = dict(
-    alpha             = 16.5e-6,  # CTE for 316 LN stainless steel [1/K]
-    init_temperature  = 293.15,   # stress-free reference temperature [K]
-    final_temperature = 4.0,      # superconducting service temperature [K]
-) | material_options_const_temp
+# Gravity body-force options (None disables the gravity load).
+if _grav.get('enabled', False):
+    gravity_options = dict(
+        density = float(_mat['density_kg_m3']),
+        g_vec   = tuple(float(c) for c in _grav['g_vec_m_s2']),
+    )
+else:
+    gravity_options = None
 
 # ── Support-function geometry ─────────────────────────────────────────────────
 # Clamp radius = 2 × coil half-width; sigmoid sharpness tuned to clamp_radius.
@@ -148,7 +170,8 @@ def run_one_n_quadpoints(
         nfp              = nfp,
         stellsym         = stellsym,
         mesh_options     = mesh_options,
-        material_options = material_options_const_temp,
+        material_options = material_options,
+        gravity_options  = gravity_options,
         base_support_fns = support_fn,
         base_support_dofs = support_dofs,
         problem_options  = problem_options|{'solver':solver, 'adjoint_solver':solver},
@@ -1101,17 +1124,12 @@ def _run_dolfinx_pipeline(
     nu  = coil_fem._nu
     rho = coil_fem._rho
 
-    # Thermal eigenstrain
+    # Thermal eigenstrain: ε_th = -shrinkage · I (linear contraction fraction).
     eps_th: np.ndarray | None = None
-    if (
-        coil_fem._alpha is not None
-        and coil_fem._init_temperature is not None
-        and coil_fem._final_temperature is not None
-    ):
-        dT     = coil_fem._final_temperature - coil_fem._init_temperature
-        alpha  = coil_fem._alpha
-        eps_th = np.eye(3, dtype=np.float64) * (alpha * dT)
-        print(f"  Thermal eigenstrain active: alpha={alpha}, dT={dT}, eps_th[0,0]={eps_th[0,0]:.4e}")
+    if coil_fem._shrinkage is not None:
+        shrinkage = coil_fem._shrinkage
+        eps_th = -np.eye(3, dtype=np.float64) * shrinkage
+        print(f"  Thermal eigenstrain active: shrinkage={shrinkage}, eps_th[0,0]={eps_th[0,0]:.4e}")
 
     # Gravity
     if coil_fem.gravity_options is not None:
