@@ -17,27 +17,27 @@ Begin ----------
 MAXITER = 500
 solving with float64
 solving with float64
-Filament time 13064.945180416107
-Normalized flux 7.894684398323379e-07
-Max (lse) von mises 3.28325265406674e+16
-Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0)]
-Max curvatures [Array(2.55356, dtype=float64), Array(2.5525, dtype=float64), Array(2.55206, dtype=float64), Array(2.55463, dtype=float64), Array(2.55366, dtype=float64)]
+Filament time 10103.149232625961
+Normalized flux 8.023220757404187e-07
+Max (lse) von mises 3.242909026887936e+16
+Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(1.0659428252265859e-09)]
+Max curvatures [Array(2.55512, dtype=float64), Array(2.55043, dtype=float64), Array(2.55443, dtype=float64), Array(2.55549, dtype=float64), Array(2.5555, dtype=float64)]
 Final value of terms
-    FLUX_WEIGHT**2 * Jf_norm_cons  0.0012096722708388264
-    + CC_WEIGHT * Jccdist          5.03074784592298e-06
+    FLUX_WEIGHT**2 * Jf_norm_cons  0.0013394225185596384
+    + CC_WEIGHT * Jccdist          4.553497457853453e-06
     + CS_WEIGHT * Jcsdist          0.0
-    + STRESS_WEIGHT * Jstress      0.0328325265406674
-    + CURVATURE_WEIGHT * sum(Jcs)  0.0
+    + STRESS_WEIGHT * Jstress      0.032429090268879364
+    + CURVATURE_WEIGHT * sum(Jcs)  3.913636268644959e-07
     + LINK_WEIGHT * linkNum        0
-    + LENGTH_WEIGHT * sum(Jls)     0.0
+    + LENGTH_WEIGHT * sum(Jls)     2.1318856504531716e-07
 -----------------------------------------
 res   message: STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT
   success: False
    status: 1
-      fun: 0.03404722955931352
-        x: [-6.471e-04  5.215e-01 ...  1.131e-03 -1.103e-02]
+      fun: 0.033773670837125486
+        x: [-1.309e-04  5.227e-01 ...  3.034e-03 -1.038e-02]
       nit: 500
-      jac: [-8.302e-04 -3.227e-03 ... -2.439e-03 -1.676e-03]
-     nfev: 1105
-     njev: 1105
+      jac: [ 4.200e-03  7.488e-03 ... -1.745e-03  2.014e-03]
+     nfev: 1082
+     njev: 1082
  hess_inv: <326x326 LbfgsInvHessProduct with dtype=float64>
