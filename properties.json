@@ -1,0 +1,32 @@
+{
+  "material": {
+    "name": "AISI 316LN austenitic stainless steel (W7-X coil casing / support-structure steel)",
+    "E_Pa": 205e9,
+    "nu": 0.30,
+    "density_kg_m3": 8000.0,
+    "shrinkage": 0.0029
+  },
+  "gravity": {
+    "enabled": true,
+    "g_vec_m_s2": [0.0, 0.0, -9.80665]
+  },
+  "units": {
+    "E_Pa": "Young's modulus [Pa]",
+    "nu": "Poisson ratio [-]",
+    "density_kg_m3": "mass density [kg/m^3]",
+    "shrinkage": "linear thermal contraction fraction 293 K -> 4 K [-]; applied as eps_th = -shrinkage * I",
+    "g_vec_m_s2": "gravitational acceleration vector [m/s^2]"
+  },
+  "references": [
+    {
+      "name": "A. Foussat et al., Mechanical design and construction qualification program on ITER correction coils structures, Nuclear Engineering and Design 269 (2013) 116-124. Table 5 (316LN FEA inputs at cryogenic temperature: E = 205 GPa, G = 78.8 GPa, nu = 0.30, rho = 8000 kg/m^3, integral thermal contraction 293/4 K = 0.29 %).",
+      "doi": "10.1016/j.nucengdes.2013.08.016",
+      "covers": ["E_Pa", "nu", "density_kg_m3", "shrinkage"]
+    },
+    {
+      "name": "Standard gravity g0 = 9.80665 m/s^2 (defined constant; 3rd CGPM, 1901; ISO 80000-3).",
+      "doi": null,
+      "covers": ["g_vec_m_s2"]
+    }
+  ]
+}
