@@ -904,12 +904,22 @@ def _dolfinx_solve(
         V_s = fem.functionspace(mesh, ("Lagrange", fem_degree))
         k_fn = fem.Function(V_s)
 
-        # Map coilforce node index → dolfinx DOF index via coordinate matching.
+        # Assign the spring stiffness at every dolfinx DOF via coordinate matching.
         # For TET10, V_s has P2 DOFs at corner nodes AND edge midpoints, which
         # correspond exactly to all nodes in pts_np.
+        #
+        # Query per-DOF (DOF → nearest coilforce node), NOT per-node.  The
+        # per-node direction (node → nearest DOF, then k[dof_for_node]=k_node)
+        # is unsafe: the coilforce mesh contains coincident nodes (e.g. at the
+        # cross-section seam), so several nodes collapse onto the same nearest
+        # DOF.  That leaves the other DOFs orphaned at k=0 and silently drops
+        # ~5% of the Winkler stiffness in the support region (→ ~1.5% von Mises
+        # error localised to the support on curved meshes).  Filling per-DOF
+        # guarantees every DOF receives its coincident node's stiffness; two
+        # coincident nodes carry the same stiffness, so the choice is immaterial.
         dof_coords_s = V_s.tabulate_dof_coordinates()  # (n_dofs, 3)
-        tree_dof = cKDTree(dof_coords_s)
-        dist, dof_for_node = tree_dof.query(pts_np)    # (n_nodes,)
+        tree_node = cKDTree(pts_np)
+        dist, node_for_dof = tree_node.query(dof_coords_s)  # (n_dofs,)
         if np.max(dist) > 1e-8 * (np.abs(pts_np).max() + 1.0):
             raise RuntimeError(
                 f"P{fem_degree} DOF coords deviate from mesh nodes by up to "
@@ -917,8 +927,7 @@ def _dolfinx_solve(
                 "coordinate matching failed."
             )
 
-        k_fn.x.array[:] = 0.0
-        k_fn.x.array[dof_for_node] = spring_k_nodes
+        k_fn.x.array[:] = spring_k_nodes[node_for_dof]
         k_fn.x.scatter_forward()
 
         facet_tag_vals = np.ones(len(ext_facets), dtype=np.int32)
