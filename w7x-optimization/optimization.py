@@ -193,7 +193,7 @@ CURVATURE_TARGET = np.max([c.kappa() for c in base_curves])
 # To be increased for actual scan
 MAXFUN = 1e7
 CURVATURE_WEIGHT = 1000
-FLUX_WEIGHT = 200000
+FLUX_WEIGHT = 1000000
 FORCE_WEIGHT = 5/1e5
 LINK_WEIGHT = 10
 Lp = 2  # p of Lp curve curvature

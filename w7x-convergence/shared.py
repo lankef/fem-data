@@ -78,7 +78,7 @@ else:
 
 # ── Support-function geometry ─────────────────────────────────────────────────
 # Clamp radius = 2 × coil half-width; sigmoid sharpness tuned to clamp_radius.
-clamp_radius = 2 * max(mesh_options['w1'], mesh_options['w2'])
+clamp_radius = 0.3 # 2 * max(mesh_options['w1'], mesh_options['w2'])
 sigmoid_beta  = 20.0 / clamp_radius
 
 support_dofs = None   # static support (no optimisable parameters)
