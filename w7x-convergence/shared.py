@@ -806,10 +806,23 @@ def _dolfinx_solve(
     v = ufl.TestFunction(V)
 
     # ── Constitutive law (with optional thermal eigenstrain) ─────────────────
+    # ``sigma`` is the full thermoelastic stress σ = C:(ε − ε_th).  It is used
+    # only for the von Mises post-processing, where the argument is a known
+    # Function.  It must NOT be used in the bilinear form: when ε_th is a
+    # non-None constant, the ``−C:ε_th`` term carries no trial-function
+    # argument, so placing it in ``a`` mixes arity-2 and arity-1 terms and
+    # makes FFCx raise ``ArityMismatch: Adding expressions with non-matching
+    # form arguments () vs ('v_1',)``.  The thermal term is instead moved to
+    # the load vector L (see below).
     def sigma(u_fn):
         eps_u = ufl.sym(ufl.grad(u_fn))
         eps_m = eps_u - eps_th_ufl if eps_th_ufl is not None else eps_u
         return lam * ufl.tr(eps_m) * ufl.Identity(3) + 2 * mu * eps_m
+
+    def sigma_elastic(u_fn):
+        """Thermal-free stress C:ε(u) for the (arity-2) bilinear form."""
+        eps_u = ufl.sym(ufl.grad(u_fn))
+        return lam * ufl.tr(eps_u) * ufl.Identity(3) + 2 * mu * eps_u
 
     # ── Volume integration measure ────────────────────────────────────────────
     # vol_quad_degree must match JAX-FEM's gauss_order:
@@ -837,7 +850,8 @@ def _dolfinx_solve(
         )
 
     # ── Bilinear form ─────────────────────────────────────────────────────────
-    a = ufl.inner(sigma(u), ufl.sym(ufl.grad(v))) * dx
+    # Purely elastic (thermal-free) stress so both factors carry (u, v): arity 2.
+    a = ufl.inner(sigma_elastic(u), ufl.sym(ufl.grad(v))) * dx
 
     # ── Body force (Quadrature space, one value per Gauss point) ─────────────
     # Use a Quadrature-degree function space so each of the n_quads Gauss
@@ -870,6 +884,16 @@ def _dolfinx_solve(
     f_ufl = ufl.as_vector([fx_fn, fy_fn, fz_fn])
 
     L = ufl.inner(f_ufl, v) * dx
+
+    # Thermal eigenstrain contributes an equivalent load.  Splitting
+    # σ = C:(ε(u) − ε_th) in the weak form ∫ σ:ε(v) dV = ∫ f·v dV gives
+    #     ∫ C:ε(u):ε(v) dV = ∫ f·v dV + ∫ C:ε_th:ε(v) dV,
+    # so the constant thermal stress C:ε_th enters the RHS (arity 1) rather
+    # than the bilinear form.  This keeps ``a`` purely arity-2 and matches
+    # CoilFEM, where ε_th acts through the constitutive law as a thermal load.
+    if eps_th_ufl is not None:
+        sigma_th = lam * ufl.tr(eps_th_ufl) * ufl.Identity(3) + 2 * mu * eps_th_ufl
+        L = L + ufl.inner(sigma_th, ufl.sym(ufl.grad(v))) * dx
 
     # ── Winkler spring foundation (all exterior facets) ───────────────────────
     fdim = tdim - 1
