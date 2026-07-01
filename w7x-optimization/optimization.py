@@ -57,9 +57,10 @@ problem_options = dict(
 # ``fem-data/properties.json`` (repo root) and loaded here so every script uses
 # the same values + literature references.  W7-X coil casings / support
 # structure are AISI 316LN austenitic stainless steel; values (E, nu, density,
-# 293→4 K shrinkage) are from Foussat et al. 2013 (see properties.json).
+# 293→4 K integral thermal contraction) are from Foussat et al. 2013 (see
+# properties.json).
 # To disable thermal or gravity, edit properties.json (set gravity.enabled=false
-# or drop the shrinkage key); no code changes needed.
+# or drop the itc key); no code changes needed.
 # ─────────────────────────────────────────────────────────────────────────────
 _PROPERTIES_PATH = Path(__file__).resolve().parent.parent / 'properties.json'
 with open(_PROPERTIES_PATH) as _f:
@@ -70,10 +71,10 @@ _grav = _PROPERTIES.get('gravity', {})
 
 # Elastic + thermal material options forwarded to CoilFEMObjective.
 material_options = dict(
-    E         = float(_mat['E_Pa']),
-    nu        = float(_mat['nu']),
-    density   = float(_mat['density_kg_m3']),
-    shrinkage = float(_mat['shrinkage']),   # linear contraction ΔL/L; eps_th = -shrinkage·I
+    E       = float(_mat['E_Pa']),
+    nu      = float(_mat['nu']),
+    density = float(_mat['density_kg_m3']),
+    itc     = float(_mat['itc']),   # integral thermal contraction ΔL/L; eps_th = -itc·I
 )
 
 # Gravity body-force options (None disables the gravity load).
@@ -86,7 +87,7 @@ else:
     gravity_options = None
 
 # Backward-compatible aliases: existing notebooks import these names.  Both now
-# point at the single JSON-sourced dict (thermal shrinkage included).
+# point at the single JSON-sourced dict (thermal itc included).
 material_options_const_temp = material_options
 material_options_variable_temp = material_options
 
