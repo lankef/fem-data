@@ -91,6 +91,28 @@ else:
 material_options_const_temp = material_options
 material_options_variable_temp = material_options
 
+def ifft_simsopt(x, order):
+    """Fourier coefficients of a periodic sample array in simsopt's
+    ``CurveXYZFourier`` dof order ``[c(0), s(1), c(1), ..., s(order), c(order)]``.
+
+    ``x`` is assumed sampled uniformly over the full period with the endpoint
+    excluded, i.e. ``x[j] = f(2*pi*j/n)``.  The returned array has length
+    ``2*order + 1`` and reproduces ``f`` truncated to ``order`` via
+    ``f(theta) = c(0) + sum_m [ s(m) sin(m theta) + c(m) cos(m theta) ]``.
+    """
+    x = np.asarray(x, dtype=float)
+    n = x.size
+    Xf = np.fft.fft(x)
+    dofs = np.zeros(2 * order + 1)
+    dofs[0] = Xf[0].real / n                       # cos(0) = mean
+    for m in range(1, order + 1):
+        # Nyquist mode (even n) has no conjugate partner → half weight.
+        fac = 1.0 if (n % 2 == 0 and m == n // 2) else 2.0
+        dofs[2 * m - 1] = -fac * Xf[m].imag / n    # sin(m)
+        dofs[2 * m]     =  fac * Xf[m].real / n    # cos(m)
+    return dofs
+
+
 # Load curves from lists of arrays containing x, y, and z.
 def simsopt_curves_from_xyz(
     contour_X,
@@ -213,10 +235,25 @@ INIT_ORDER = 4          # Fourier order of the initial circular coils
 ORDER_INCREMENT = 2     # order added to the base curves each continuation step
 CONT_STEPS = 3          # number of continuation steps
 CIRCLE_RADIUS_FACTOR = 3  # circular coil radius R1 = factor * plasma minor radius
+TARGET_QUADPOINTS_PER_COIL = 100  # aim for ~this many quadpoints per base coil
+
+
+def ppp_for_target_quadpoints(order, target=TARGET_QUADPOINTS_PER_COIL):
+    """Points-per-period so a CurveXYZFourier's ``order*ppp`` quadpoint count is
+    as close to ``target`` as possible.
+
+    A ``CurveXYZFourier`` of Fourier order ``order`` built with ``ppp`` points
+    per period carries ``order*ppp`` quadpoints.  This count sets both the
+    Biot-Savart source resolution and the FEM mesh's phi-slice count in
+    coilforce, so we keep it roughly constant (~``target``) across continuation
+    steps instead of letting it grow with ``order`` (a fixed ppp would).
+    """
+    return max(1, int(round(target / order)))
 
 
 def increase_base_curve_order(base_curves, coils_per_half_field_period, increment):
     order_in = base_curves[0].order
+    new_order = order_in + increment
     contour_X = []
     contour_Y = []
     contour_Z = []
@@ -229,8 +266,8 @@ def increase_base_curve_order(base_curves, coils_per_half_field_period, incremen
         contour_X,
         contour_Y,
         contour_Z,
-        order=order_in + increment,
-        ppp=20,
+        order=new_order,
+        ppp=ppp_for_target_quadpoints(new_order),
     )
     return base_curves_out
 def run_filament_free(
@@ -424,6 +461,7 @@ def run_continuation(
     base_curves = create_equally_spaced_curves(
         coil_per_half_fp, plasma_surface.nfp, stellsym=True,
         R0=R0, R1=R1, order=INIT_ORDER,
+        numquadpoints=INIT_ORDER * ppp_for_target_quadpoints(INIT_ORDER),
     )
 
     result = None
