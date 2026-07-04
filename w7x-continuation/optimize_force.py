@@ -30,7 +30,7 @@ time1 = time.time()
     Jcsdist, Jcsdist_actual,
     Jstress,
     Jls, linkNum,
-) = run_continuation(
+), nit_list, nfev_list = run_continuation(
     base_currents=base_currents, 
     plasma_surface=plasma_surface_vc, 
     Bnormal_plasma=Bnormal_plasma, 
@@ -43,6 +43,8 @@ time2 = time.time()
 np.save('misc_force', {
     'nit': res.nit,
     'nfev': res.nfev,
+    'nit_list': nit_list, 
+    'nfev_list': nfev_list,
     'time': time2-time1, 
 })
 save(coils, filename='coils_force.json')

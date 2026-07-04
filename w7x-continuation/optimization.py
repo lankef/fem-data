@@ -457,6 +457,8 @@ def run_continuation(
     )
 
     result = None
+    nit_list = []
+    nfev_list = []
     for step in range(CONT_STEPS):
         print('======================================================')
         print('Continuation step', step, '/ order', base_curves[0].order)
@@ -474,8 +476,10 @@ def run_continuation(
             support_kwargs=support_kwargs,
             # flux_norm_target=FLUX_NORM_TARGET,
         )
+        nit_list.append(result.nit)
+        nfev_list.append(result.nfev)
         if step < CONT_STEPS - 1:
             base_curves = increase_base_curve_order(
                 base_curves, coil_per_half_fp, ORDER_INCREMENT
             )
-    return result
+    return result, nit_list, nfev_list
