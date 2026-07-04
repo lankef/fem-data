@@ -1,34 +1,34 @@
 Btarget should have shape (25, 50)
 Btarget has shape (25, 50)
-Initial normalized flux 5.435342747760342e-07
+Initial normalized flux 5.017968221761737e-07
 Setting normalized flux target to this value.
 Initial lengths [Array(8.54929644, dtype=float64), Array(8.47945083, dtype=float64), Array(8.45877022, dtype=float64), Array(8.55373924, dtype=float64), Array(8.50500945, dtype=float64)]
 Setting length targets to these values.
 Optimizing L2 force
 Begin ----------
 MAXITER = 500
-Filament time 250.8837432861328
-Normalized flux 5.553565544178521e-07
-L2 force 97.74787827963655
+Filament time 223.49008917808533
+Normalized flux 5.048196404169121e-07
+L2 force 97.78986533526717
 Lengths [np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0), np.float64(0.0)]
-Max curvatures [Array(2.55532114, dtype=float64), Array(2.55533798, dtype=float64), Array(2.55496469, dtype=float64), Array(2.55535947, dtype=float64), Array(2.55532753, dtype=float64)]
+Max curvatures [Array(2.55322332, dtype=float64), Array(2.55185857, dtype=float64), Array(2.5553501, dtype=float64), Array(2.55535022, dtype=float64), Array(2.55533911, dtype=float64)]
 Final value of terms
-    FLUX_WEIGHT**2 * Jf_norm_cons  2.7953259185868388e-06
-    + CC_WEIGHT * Jccdist          6.276160067931869e-09
+    FLUX_WEIGHT**2 * Jf_norm_cons  1.1421787645676784e-06
+    + CC_WEIGHT * Jccdist          0.0
     + CS_WEIGHT * Jcsdist          0.0
-    + FORCE_WEIGHT * Jforce        0.004887393913981828
-    + CURVATURE_WEIGHT * sum(Jcs)  6.718163480699024e-09
+    + FORCE_WEIGHT * Jforce        0.004889493266763359
+    + CURVATURE_WEIGHT * sum(Jcs)  4.498084712519542e-09
     + LINK_WEIGHT * linkNum        0
     + LENGTH_WEIGHT * sum(Jls)     0.0
 -----------------------------------------
 res   message: CONVERGENCE: RELATIVE REDUCTION OF F <= FACTR*EPSMCH
   success: True
    status: 0
-      fun: 0.004890202234223964
-        x: [ 1.620e+06  5.413e+00 ...  9.858e-04 -1.895e-03]
-      nit: 226
-      jac: [ 1.204e-08 -6.654e-04 ...  6.622e-05  1.526e-04]
-     nfev: 731
-     njev: 731
+      fun: 0.004890639943612639
+        x: [ 1.620e+06  5.414e+00 ...  2.716e-03 -1.626e-03]
+      nit: 209
+      jac: [ 1.207e-08  4.104e-04 ... -1.003e-03  8.086e-05]
+     nfev: 778
+     njev: 778
  hess_inv: <316x316 LbfgsInvHessProduct with dtype=float64>
 Missing attribute is p

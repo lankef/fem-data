@@ -223,7 +223,6 @@ Lp = 2  # p of Lp curve curvature
 CC_WEIGHT = 100
 CS_WEIGHT = 100
 LENGTH_WEIGHT = 200
-FLUX_NORM_TARGET = 5e-4
 MAXITER = 5
 STRESS_WEIGHT = 1e-18
 
@@ -235,7 +234,7 @@ INIT_ORDER = 4          # Fourier order of the initial circular coils
 ORDER_INCREMENT = 2     # order added to the base curves each continuation step
 CONT_STEPS = 3          # number of continuation steps
 CIRCLE_RADIUS_FACTOR = 3  # circular coil radius R1 = factor * plasma minor radius
-TARGET_QUADPOINTS_PER_COIL = 100  # aim for ~this many quadpoints per base coil
+TARGET_QUADPOINTS_PER_COIL = 80  # aim for ~this many quadpoints per base coil
 
 
 def ppp_for_target_quadpoints(order, target=TARGET_QUADPOINTS_PER_COIL):
@@ -275,7 +274,6 @@ def run_filament_free(
         plasma_surface, Bnormal_plasma, 
         MAXITER, force_mode,
         support_type, support_kwargs,
-        flux_norm_target=None,
     ):
 
     import logging
@@ -302,12 +300,6 @@ def run_filament_free(
         definition='quadratic flux',
     )
     print('Initial normalized flux', Jf_norm.J())
-    if flux_norm_target is None:
-        FLUX_NORM_TARGET = Jf_norm.J()
-        print('Setting normalized flux target to this value.')
-    else:
-        FLUX_NORM_TARGET = flux_norm_target
-        print('Using fixed normalized flux target', FLUX_NORM_TARGET)
     Jf_norm_cons = QuadraticPenalty(Jf_norm, FLUX_NORM_TARGET, 'max')
     Jls = [
         QuadraticPenalty(
@@ -480,7 +472,7 @@ def run_continuation(
             force_mode=force_mode,
             support_type=support_type,
             support_kwargs=support_kwargs,
-            flux_norm_target=FLUX_NORM_TARGET,
+            # flux_norm_target=FLUX_NORM_TARGET,
         )
         if step < CONT_STEPS - 1:
             base_curves = increase_base_curve_order(

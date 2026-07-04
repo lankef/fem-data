@@ -1,4 +1,4 @@
-[gl042.hpc.nyu.edu:505776] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+[gl053.hpc.nyu.edu:903387] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
 Traceback (most recent call last):
   File "/scratch/lf2869/code/simsopt/src/simsopt/_core/json.py", line 159, in as_dict
     a = getattr(self, c)
