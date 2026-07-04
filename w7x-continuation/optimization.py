@@ -476,8 +476,8 @@ def run_continuation(
             support_kwargs=support_kwargs,
             # flux_norm_target=FLUX_NORM_TARGET,
         )
-        nit_list.append(result.nit)
-        nfev_list.append(result.nfev)
+        nit_list.append(result[2].nit)
+        nfev_list.append(result[2].nfev)
         if step < CONT_STEPS - 1:
             base_curves = increase_base_curve_order(
                 base_curves, coil_per_half_fp, ORDER_INCREMENT
