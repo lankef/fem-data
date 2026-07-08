@@ -2338,7 +2338,7 @@
       }
     },
     "CoilSupportTopBottom1": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportTopBottom",
       "@name": "CoilSupportTopBottom1",
       "@version": null,
@@ -2381,7 +2381,7 @@
       }
     },
     "CoilSupportTopBottom2": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportTopBottom",
       "@name": "CoilSupportTopBottom2",
       "@version": null,
@@ -2424,7 +2424,7 @@
       }
     },
     "CoilSupportTopBottom3": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportTopBottom",
       "@name": "CoilSupportTopBottom3",
       "@version": null,
@@ -2467,7 +2467,7 @@
       }
     },
     "CoilSupportTopBottom4": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportTopBottom",
       "@name": "CoilSupportTopBottom4",
       "@version": null,
@@ -2510,7 +2510,7 @@
       }
     },
     "CoilSupportTopBottom5": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportTopBottom",
       "@name": "CoilSupportTopBottom5",
       "@version": null,
@@ -2522,7 +2522,7 @@
       }
     },
     "CoilFEMObjective1": {
-      "@module": "coilforce.simsopt_bridge",
+      "@module": "coil_fem.simsopt.objective",
       "@class": "CoilFEMObjective",
       "@name": "CoilFEMObjective1",
       "@version": null,

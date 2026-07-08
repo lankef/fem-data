@@ -21,7 +21,7 @@ from shared import (
 )
 
 # ── PETSc solver options ──────────────────────────────────────────────────────
-# coilforce passes an empty dict for petsc_solver, so JAX-FEM would default to
+# coil-fem passes an empty dict for petsc_solver, so JAX-FEM would default to
 # ksp_type='bcgsl' / pc_type='ilu'.  Patch petsc_solve to enforce the desired
 # options.  Setting -ksp_type/-pc_type in the PETSc options database before the
 # call ensures ksp.setFromOptions() initialises the PC to 'lu'; the subsequent

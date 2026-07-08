@@ -28,8 +28,8 @@ from simsopt.geo import (
 )
 from simsopt.configs import get_data
 from simsopt.geo import plot
-from coilforce.simsopt_bridge    import CoilFEMObjective
-from coilforce.support           import CoilSupportDiscrete, CoilSupportTopBottom
+from coil_fem.simsopt            import CoilFEMObjective
+from coil_fem.simsopt            import CoilSupportDiscrete, CoilSupportTopBottom
 
 # ----- FEM options -----
 
@@ -244,7 +244,7 @@ def ppp_for_target_quadpoints(order, target=TARGET_QUADPOINTS_PER_COIL):
     A ``CurveXYZFourier`` of Fourier order ``order`` built with ``ppp`` points
     per period carries ``order*ppp`` quadpoints.  This count sets both the
     Biot-Savart source resolution and the FEM mesh's phi-slice count in
-    coilforce, so we keep it roughly constant (~``target``) across continuation
+    coil-fem, so we keep it roughly constant (~``target``) across continuation
     steps instead of letting it grow with ``order`` (a fixed ppp would).
     """
     return max(1, int(round(target / order)))

@@ -2353,7 +2353,7 @@
       }
     },
     "CoilSupportDiscrete1": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportDiscrete",
       "@name": "CoilSupportDiscrete1",
       "@version": null,
@@ -2422,7 +2422,7 @@
       }
     },
     "CoilSupportDiscrete2": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportDiscrete",
       "@name": "CoilSupportDiscrete2",
       "@version": null,
@@ -2491,7 +2491,7 @@
       }
     },
     "CoilSupportDiscrete3": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportDiscrete",
       "@name": "CoilSupportDiscrete3",
       "@version": null,
@@ -2560,7 +2560,7 @@
       }
     },
     "CoilSupportDiscrete4": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportDiscrete",
       "@name": "CoilSupportDiscrete4",
       "@version": null,
@@ -2629,7 +2629,7 @@
       }
     },
     "CoilSupportDiscrete5": {
-      "@module": "coilforce.support",
+      "@module": "coil_fem.simsopt.support",
       "@class": "CoilSupportDiscrete",
       "@name": "CoilSupportDiscrete5",
       "@version": null,
@@ -2652,7 +2652,7 @@
       }
     },
     "CoilFEMObjective1": {
-      "@module": "coilforce.simsopt_bridge",
+      "@module": "coil_fem.simsopt.objective",
       "@class": "CoilFEMObjective",
       "@name": "CoilFEMObjective1",
       "@version": null,

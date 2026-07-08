@@ -18,11 +18,11 @@ print(f"JAX devices: {jax.devices()}")
 # Enable 64-bit precision for better accuracy
 jax.config.update("jax_enable_x64", True)
 
-# ── Coilforce / simsopt imports ───────────────────────────────────────────────
-from coilforce.curve_jax import CurveXYZFourierJAX
-from coilforce.framed_curve_jax import make_centroid_frame, make_rmf_frame  # noqa: F401
-from coilforce.meshing import rectangle_sweep, disk_sweep  # noqa: F401
-from coilforce.coil_fem import CoilFEM
+# ── coil-fem / simsopt imports ────────────────────────────────────────────────
+from coil_fem.geo import CurveXYZFourierJAX
+from coil_fem.geo import make_centroid_frame, make_rmf_frame  # noqa: F401
+from coil_fem.meshing import rectangle_sweep, disk_sweep  # noqa: F401
+from coil_fem import CoilFEM
 
 # ── Physics / solver options ──────────────────────────────────────────────────
 # Rectangular cross-section (half-widths in metres).
@@ -332,8 +332,8 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
     import interpax
     import jax.numpy as jnp
 
-    from coilforce.curve_jax import CurveXYZFourierJAX
-    from coilforce.elasticity import recompute_fe_geometry
+    from coil_fem.geo import CurveXYZFourierJAX
+    from coil_fem.problem import recompute_fe_geometry
 
     base_curves_dofs = [c.dofs for c in coil_fem.base_curves_jax]
     out = []
@@ -341,11 +341,11 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
     for i in range(len(coil_fem.base_curves_jax)):
         base = coil_fem.base_curves_jax[i]
         dofs_i = base_curves_dofs[i]
-        meta = coil_fem._grid_meta[i]
+        mesh = coil_fem.meshes[i]
         prob_i = coil_fem._problems[i]
 
         # Physical mesh-node positions (differentiable, but we convert to numpy)
-        pts_i = coil_fem._mesh_points_from_dofs(dofs_i, i)
+        pts_i = mesh.mesh_points_from_dofs(dofs_i)
 
         # FE geometry: JxW and physical quad points
         _, JxW_i, _, pqp_i = recompute_fe_geometry(
@@ -362,9 +362,9 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
         t_hat_cl = gammadash_cl / jnp.linalg.norm(
             gammadash_cl, axis=1, keepdims=True
         )
-        phi_q = meta["phi_quad"]                   # (n_cells, n_quads) static
-        n_cells = meta["n_cells"]
-        n_quads = meta["n_quads"]
+        phi_q = mesh.phi_quad                      # (n_cells, n_quads) static
+        n_cells = mesh.n_cells
+        n_quads = mesh.n_quads
         t_hat_q = interpax.interp1d(
             phi_q.ravel(),
             curve.quadpoints,
@@ -380,7 +380,7 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
                 "pqp":     np.asarray(pqp_i,       dtype=np.float64),
                 "JxW":     np.asarray(JxW_i,       dtype=np.float64),
                 "t_hat_q": np.asarray(t_hat_q,     dtype=np.float64),
-                "A":       float(meta["cross_section_area"]),
+                "A":       float(mesh.cross_section_area),
                 "n_cells": n_cells,
                 "n_quads": n_quads,
             }
@@ -399,7 +399,7 @@ def _build_symmetry_sources(
 ) -> list[dict]:
     """Expand the base-coil source data to all symmetry images.
 
-    Expansion order mirrors ``src/coilforce/symmetries.py``::
+    Expansion order mirrors ``coil_fem/geo/symmetries.py``::
 
         for k in 0..nfp-1:
             for flip in [False, True] if stellsym else [False]:
@@ -413,7 +413,7 @@ def _build_symmetry_sources(
     ``base_coil_idx`` int                which base coil this image comes from
     ``current``       float              signed current [A]
     """
-    from coilforce.symmetries import apply_symmetries_to_currents
+    from coil_fem.geo import apply_symmetries_to_currents
 
     n_base  = len(coil_fem.base_curves_jax)
     nfp     = coil_fem.nfp
@@ -661,7 +661,7 @@ def _dolfinx_solve(
 
     Both JAX-FEM (via jax_fem.basis) and dolfinx (via basix) use the same
     basix quadrature rule, so the within-cell Gauss-point ordering is
-    identical; only a cell-level permutation (coilforce → dolfinx) is needed.
+    identical; only a cell-level permutation (coil-fem → dolfinx) is needed.
 
     Von Mises stress is evaluated at the same Gauss points and averaged per
     cell, matching CoilFEM's ``mean(VM(xq), q=1..n_quads)`` convention as
@@ -675,12 +675,12 @@ def _dolfinx_solve(
 
     Thermal eigenstrain ``eps_th`` (if not None) is applied in **both** the
     constitutive law (weak-form bilinear part) and the von Mises post-processing,
-    matching ``coilforce.thermal.cauchy_stress_with_thermal_strain``.
+    matching ``coil_fem.metrics.cauchy_stress_small_strain``.
 
     Parameters
     ----------
     fvol_q : (n_cells, n_quads, 3)
-        Body force at every FEM quadrature point [N/m³], in coilforce cell
+        Body force at every FEM quadrature point [N/m³], in coil-fem cell
         order.  For TET10 with ``gauss_order=2`` this has ``n_quads=4``.
     spring_k_nodes : (n_nodes,)
         Winkler spring stiffness at every mesh node [N/m³].  Non-zero only on
@@ -691,10 +691,10 @@ def _dolfinx_solve(
     Returns
     -------
     dict with keys:
-        ``displacement``   (n_nodes, 3) [m]  — nodal displacement in coilforce
+        ``displacement``   (n_nodes, 3) [m]  — nodal displacement in coil-fem
                            node order (KD-tree matched from dolfinx DOF order).
         ``von_mises_cell`` (n_cells,)   [Pa] — mean von Mises stress over
-                           Gauss points per cell, in coilforce cell order.
+                           Gauss points per cell, in coil-fem cell order.
     """
     _require_dolfinx()
 
@@ -714,15 +714,15 @@ def _dolfinx_solve(
     # ── Build dolfinx mesh ────────────────────────────────────────────────────
     # TET4  → degree-1 straight-sided geometry (4 corner nodes / cell).
     # TET10 → degree-2 ISOPARAMETRIC (curved-sided) geometry using all 10 nodes,
-    #         so the dolfinx geometry matches coilforce's curved TET10 elements.
+    #         so the dolfinx geometry matches coil-fem's curved TET10 elements.
     #         The curved-edge mesh update moved the midside nodes off the
-    #         straight chord midpoints; coilforce's JAX-FEM solve uses those
+    #         straight chord midpoints; coil-fem's JAX-FEM solve uses those
     #         positions in its isoparametric element map, so a straight
     #         P2-on-degree-1 reference would solve a slightly different
     #         (chord-sided) problem and would also break the P2 DOF coordinate
     #         matching below (dolfinx would place edge DOFs at chord midpoints).
     #
-    # coilforce/meshio store TET10 connectivity in VTK ordering, but dolfinx
+    # coil-fem/meshio store TET10 connectivity in VTK ordering, but dolfinx
     # `create_mesh` expects basix/DefElement ordering.  `perm_vtk` maps
     # VTK → dolfinx via  a_dolfin[i] = a_vtk[p[i]]  (i.e. cells[:, p]).
     corner_cells = cells_np[:, :4] if is_tet10 else cells_np
@@ -748,13 +748,13 @@ def _dolfinx_solve(
         x=pts_np.astype(np.float64),
     )
 
-    # ── Build coilforce → dolfinx cell-index permutation ──────────────────────
+    # ── Build coil-fem → dolfinx cell-index permutation ──────────────────────
     # `create_mesh` reorders cells for cache locality, so DG0 dof index c does
-    # NOT correspond to coilforce cell c.  Match cell centroids via KD-tree to
+    # NOT correspond to coil-fem cell c.  Match cell centroids via KD-tree to
     # build the permutation in both directions; same trick as for Pn nodes
     # below.  Required for:
     #   * Injecting cell-mean body force into DG0 functions in the right slot.
-    #   * Returning von Mises (DG0) in coilforce cell order to the caller.
+    #   * Returning von Mises (DG0) in coil-fem cell order to the caller.
     # `compute_midpoints` averages each cell's *vertex* (corner) geometry nodes
     # (its source assumes a linear geometry), so it returns the corner centroid
     # even for the degree-2 isoparametric mesh.  For curved TET10 the mean of
@@ -768,7 +768,7 @@ def _dolfinx_solve(
     if cent_dfx.shape[0] != cells_np.shape[0]:
         raise RuntimeError(
             f"Cell count mismatch: dolfinx={cent_dfx.shape[0]}, "
-            f"coilforce={cells_np.shape[0]}.  Did dolfinx drop cells?"
+            f"coil-fem={cells_np.shape[0]}.  Did dolfinx drop cells?"
         )
     tol = 1e-8 * (np.abs(pts_np).max() + 1.0)
     tree_cell = cKDTree(cent_dfx)
@@ -778,14 +778,14 @@ def _dolfinx_solve(
         dist_c, mapping = tree_cell.query(cent_cf)        # (n_cells,)
         if best is None or np.max(dist_c) < best[0]:
             best = (np.max(dist_c), mapping)
-    dist_c_max, dolfinx_for_coilforce = best
+    dist_c_max, dolfinx_for_coilfem = best
     if dist_c_max > tol:
         raise RuntimeError(
             f"Cell centroid match failed (max distance "
             f"{dist_c_max:.3e} m > tol {tol:.3e}).  Dolfinx mesh may "
             "differ from input topology."
         )
-    if len(np.unique(dolfinx_for_coilforce)) != n_cells_dfx:
+    if len(np.unique(dolfinx_for_coilfem)) != n_cells_dfx:
         raise RuntimeError("Non-unique cell-centroid match; KD-tree mapping is degenerate.")
 
     # ── Material ─────────────────────────────────────────────────────────────
@@ -872,11 +872,11 @@ def _dolfinx_solve(
     # quadrature rules from basix, so the within-cell ordering is the same;
     # only a cell-level permutation is required.
     #
-    # Build inverse permutation: coilforce_for_dolfinx[c_dfx] = c_cf
-    coilforce_for_dolfinx = np.empty(n_cells_dfx, dtype=np.intp)
-    coilforce_for_dolfinx[dolfinx_for_coilforce] = np.arange(n_cells_dfx, dtype=np.intp)
-    # Reorder fvol_q from coilforce cell order to dolfinx cell order.
-    fvol_q_dfx = fvol_q[coilforce_for_dolfinx]          # (n_cells_dfx, n_quads, 3)
+    # Build inverse permutation: coilfem_for_dolfinx[c_dfx] = c_cf
+    coilfem_for_dolfinx = np.empty(n_cells_dfx, dtype=np.intp)
+    coilfem_for_dolfinx[dolfinx_for_coilfem] = np.arange(n_cells_dfx, dtype=np.intp)
+    # Reorder fvol_q from coil-fem cell order to dolfinx cell order.
+    fvol_q_dfx = fvol_q[coilfem_for_dolfinx]          # (n_cells_dfx, n_quads, 3)
     QS = fem.functionspace(mesh, _vol_quad_el)
     fx_fn = fem.Function(QS); fx_fn.x.array[:] = fvol_q_dfx[:, :, 0].ravel(); fx_fn.x.scatter_forward()
     fy_fn = fem.Function(QS); fy_fn.x.array[:] = fvol_q_dfx[:, :, 1].ravel(); fy_fn.x.scatter_forward()
@@ -908,9 +908,9 @@ def _dolfinx_solve(
         # For TET10, V_s has P2 DOFs at corner nodes AND edge midpoints, which
         # correspond exactly to all nodes in pts_np.
         #
-        # Query per-DOF (DOF → nearest coilforce node), NOT per-node.  The
+        # Query per-DOF (DOF → nearest coil-fem node), NOT per-node.  The
         # per-node direction (node → nearest DOF, then k[dof_for_node]=k_node)
-        # is unsafe: the coilforce mesh contains coincident nodes (e.g. at the
+        # is unsafe: the coil-fem mesh contains coincident nodes (e.g. at the
         # cross-section seam), so several nodes collapse onto the same nearest
         # DOF.  That leaves the other DOFs orphaned at k=0 and silently drops
         # ~5% of the Winkler stiffness in the support region (→ ~1.5% von Mises
@@ -973,20 +973,20 @@ def _dolfinx_solve(
         problem = LinearProblem(a, L, bcs=[], petsc_options_prefix="dolfinx_fallback")
         uh = problem.solve()
 
-    # ── Extract displacement in coilforce node order ──────────────────────────
+    # ── Extract displacement in coil-fem node order ──────────────────────────
     # Use a scalar Pn space to get DOF coordinates (same degree as displacement).
     # For TET10, P2 DOF positions include corner nodes and edge midpoints, which
-    # matches all nodes in pts_np; the KD-tree maps each coilforce node to the
+    # matches all nodes in pts_np; the KD-tree maps each coil-fem node to the
     # corresponding dolfinx DOF index.  uh.x.array is interleaved (x,y,z) per
     # DOF for both P1 and P2 vector spaces, so reshape(-1, 3) is always correct.
     V_s2 = fem.functionspace(mesh, ("Lagrange", fem_degree))
     dof_coords2 = V_s2.tabulate_dof_coordinates()   # (n_dofs, 3)
     tree_dof2 = cKDTree(dof_coords2)
-    _, dof_for_node2 = tree_dof2.query(pts_np)       # coilforce_node → dolfinx_dof
+    _, dof_for_node2 = tree_dof2.query(pts_np)       # coil-fem_node → dolfinx_dof
 
     uh_arr = uh.x.array.reshape(-1, 3)               # (n_dolfinx_dofs, 3)
     displacement = np.zeros((pts_np.shape[0], 3), dtype=np.float64)
-    displacement = uh_arr[dof_for_node2]             # (n_nodes, 3), coilforce order
+    displacement = uh_arr[dof_for_node2]             # (n_nodes, 3), coil-fem order
 
     # ── Von Mises stress (Gauss-point evaluation, cell mean) ──────────────────
     # Evaluate von Mises at the same n_quads Gauss points used for FEM
@@ -1016,19 +1016,19 @@ def _dolfinx_solve(
     n_quads_vm = vm_fn.x.array.shape[0] // n_cells_dfx
     vm_per_quad_dfx = vm_fn.x.array.reshape(n_cells_dfx, n_quads_vm)  # (n_cells_dfx, n_quads)
 
-    # Permute from dolfinx to coilforce cell order and average over Gauss pts.
+    # Permute from dolfinx to coil-fem cell order and average over Gauss pts.
     von_mises_cell = np.asarray(
-        vm_per_quad_dfx[dolfinx_for_coilforce].mean(axis=1), dtype=np.float64
+        vm_per_quad_dfx[dolfinx_for_coilfem].mean(axis=1), dtype=np.float64
     ).copy()
 
     return {
         "displacement":   displacement,   # (n_nodes, 3) [m]
-        "von_mises_cell": von_mises_cell, # (n_cells,) [Pa] — coilforce cell order
+        "von_mises_cell": von_mises_cell, # (n_cells,) [Pa] — coil-fem cell order
     }
 
 
 # ============================================================================
-# 6. Spring stiffness node array (coilforce → numpy full-node array)
+# 6. Spring stiffness node array (coil-fem → numpy full-node array)
 # ============================================================================
 
 def _spring_k_node_array(
@@ -1486,7 +1486,7 @@ def validate_with_dolfinx(
     Parameters
     ----------
     coil_fem : CoilFEM
-        A fully-constructed :class:`coilforce.coil_fem.CoilFEM` object.
+        A fully-constructed :class:`coil_fem.CoilFEM` object.
         The DOFs / currents used are the initial ones stored in the object.
     out_dir : str
         Root output directory.  Sub-folders ``runA_volumetric_BS/`` and
