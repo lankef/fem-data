@@ -342,7 +342,7 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
         base = coil_fem.base_curves_jax[i]
         dofs_i = base_curves_dofs[i]
         mesh = coil_fem.meshes[i]
-        prob_i = coil_fem._problems[i]
+        prob_i = coil_fem.pipelines[i].problem
 
         # Physical mesh-node positions (differentiable, but we convert to numpy)
         pts_i = mesh.mesh_points_from_dofs(dofs_i)
@@ -1050,7 +1050,7 @@ def _spring_k_node_array(
         return np.zeros(pts_i.shape[0], dtype=np.float64)
 
     winkler_k = float(coil_fem.problem_options["winkler_k"])
-    surf_idx  = np.asarray(coil_fem._surface_node_indices[i], dtype=np.int32)
+    surf_idx  = np.asarray(coil_fem.pipelines[i].surface_node_indices, dtype=np.int32)
     weights   = np.asarray(
         coil_fem._compute_support_weights(i, pts_i, dofs_i, support_dofs_i),
         dtype=np.float64,
