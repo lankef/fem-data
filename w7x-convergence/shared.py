@@ -23,6 +23,7 @@ from coil_fem.geo import CurveXYZFourierJAX
 from coil_fem.geo import make_centroid_frame, make_rmf_frame  # noqa: F401
 from coil_fem.meshing import rectangle_sweep, disk_sweep  # noqa: F401
 from coil_fem import CoilFEM
+from coil_fem.coupling import SupportFixed
 
 # ── Physics / solver options ──────────────────────────────────────────────────
 # Rectangular cross-section (half-widths in metres).
@@ -80,8 +81,6 @@ else:
 # Clamp radius = 2 × coil half-width; sigmoid sharpness tuned to clamp_radius.
 clamp_radius = 0.3 # 2 * max(mesh_options['w1'], mesh_options['w2'])
 sigmoid_beta  = 20.0 / clamp_radius
-
-support_dofs = None   # static support (no optimisable parameters)
 
 
 def support_fn(
@@ -173,8 +172,7 @@ def run_one_n_quadpoints(
         mesh_options     = mesh_options,
         material_options = material_options,
         gravity_options  = gravity_options,
-        base_support_fns = support_fn,
-        base_support_dofs = support_dofs,
+        support          = SupportFixed(support_fns=support_fn),
         problem_options  = problem_options|{'solver':solver, 'adjoint_solver':solver},
     )
     fem.save_support_vtu(str(out_dir), prefix="coil_")
@@ -1046,7 +1044,7 @@ def _spring_k_node_array(
     -------
     np.ndarray, (n_nodes,) [N/m³]
     """
-    if not coil_fem.base_support_fns:
+    if not getattr(coil_fem.support, '_support_fns', None):
         return np.zeros(pts_i.shape[0], dtype=np.float64)
 
     winkler_k = float(coil_fem.problem_options["winkler_k"])
@@ -1220,7 +1218,7 @@ def _run_dolfinx_pipeline(
         spring_k_nodes_np = np.asarray(spring_k_nodes)
 
         # Support weights (unscaled) for VTU output
-        if coil_fem.base_support_fns:
+        if getattr(coil_fem.support, '_support_fns', None):
             winkler_k   = float(coil_fem.problem_options["winkler_k"])
             support_weights_np = spring_k_nodes_np / (winkler_k + 1e-300)
         else:
@@ -1511,7 +1509,7 @@ def validate_with_dolfinx(
     """
     _require_dolfinx()
 
-    if not coil_fem.base_support_fns:
+    if not getattr(coil_fem.support, '_support_fns', None):
         import warnings
         warnings.warn(
             "CoilFEM has no support functions — no Winkler BC will be applied in "

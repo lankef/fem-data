@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 from simsopt.objectives import SquaredFlux
 from simsopt.objectives.utilities import QuadraticPenalty
 from simsopt.field import (
-    BiotSavart, Current,
+    BiotSavart, Current, Coil,
     coils_via_symmetries,
 )
 from simsopt.field.force import LpCurveForce
@@ -29,7 +29,7 @@ from simsopt.geo import (
 from simsopt.configs import get_data
 from simsopt.geo import plot
 from coil_fem.simsopt            import CoilFEMObjective
-from coil_fem.simsopt            import CoilSupportDiscrete, CoilSupportTopBottom
+from coil_fem.simsopt            import CoilSupportFixed, CoilSupportTopBottom
 
 # ----- FEM options -----
 
@@ -321,15 +321,17 @@ def run_filament_free(
         )
         print('Optimizing L2 force')
     else:
+        base_coils = [Coil(c, I) for c, I in zip(base_curves, base_currents)]
+        coil_support = support_type(
+            base_coils,
+            nfp=plasma_surface.nfp,
+            stellsym=plasma_surface.stellsym,
+            **support_kwargs,
+        )
         Jstress = CoilFEMObjective(
-            base_curves      = base_curves,
-            base_currents    = base_currents,
-            base_supports    = [support_type(**support_kwargs)
-                                for _ in base_curves],
+            coil_support,
             metrics          = ('l2_von_mises',),
             metric_weights   = (1.,),
-            nfp              = plasma_surface.nfp,
-            stellsym         = plasma_surface.stellsym,
             mesh_options     = mesh_options,
             material_options = material_options,
             gravity_options  = gravity_options,

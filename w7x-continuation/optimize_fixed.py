@@ -7,7 +7,7 @@ from optimization import (
 # Loading config from simsopt
 from simsopt.configs import get_data
 from simsopt.geo import plot
-from coil_fem.simsopt import CoilSupportDiscrete, CoilSupportTopBottom
+from coil_fem.simsopt import CoilSupportFixed, CoilSupportTopBottom
 from simsopt import save
 import time
 import numpy as np
