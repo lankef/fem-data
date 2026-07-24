@@ -331,7 +331,7 @@ def _get_base_coil_data(coil_fem: "CoilFEM") -> list[dict]:
     import jax.numpy as jnp
 
     from coil_fem.geo import CurveXYZFourierJAX
-    from coil_fem.problem import recompute_fe_geometry
+    from coil_fem.problems import recompute_fe_geometry
 
     base_curves_dofs = [c.dofs for c in coil_fem.base_curves_jax]
     out = []
