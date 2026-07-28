@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "140031921654864": {
+    "139964852052016": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031921654864",
+      "@name": "139964852052016",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -535,13 +535,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140031921654864"
+        "value": "139964852052016"
       }
     },
-    "140031923653904": {
+    "139964852014352": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031923653904",
+      "@name": "139964852014352",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -587,7 +587,7 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "140031923653904"
+        "value": "139964852014352"
       }
     },
     "Coil71": {
@@ -604,10 +604,10 @@
         "value": "Current1"
       }
     },
-    "140031921654288": {
+    "139964852052592": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031921654288",
+      "@name": "139964852052592",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1130,7 +1130,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140031921654288"
+        "value": "139964852052592"
       }
     },
     "Coil72": {
@@ -1147,10 +1147,10 @@
         "value": "Current1"
       }
     },
-    "140031923370032": {
+    "139964851746864": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031923370032",
+      "@name": "139964851746864",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1673,7 +1673,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140031923370032"
+        "value": "139964851746864"
       }
     },
     "Coil73": {
@@ -1690,10 +1690,10 @@
         "value": "Current1"
       }
     },
-    "140031923370896": {
+    "139964851747728": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031923370896",
+      "@name": "139964851747728",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2216,7 +2216,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140031923370896"
+        "value": "139964851747728"
       }
     },
     "Coil74": {
@@ -2233,10 +2233,10 @@
         "value": "Current1"
       }
     },
-    "140031923651696": {
+    "139964852012144": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140031923651696",
+      "@name": "139964852012144",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2759,7 +2759,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140031923651696"
+        "value": "139964852012144"
       }
     },
     "Coil75": {
@@ -2776,10 +2776,10 @@
         "value": "Current1"
       }
     },
-    "140029880996624": {
+    "139962812193040": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140029880996624",
+      "@name": "139962812193040",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -3298,7 +3298,7 @@
         "nu": 0.3,
         "cross_section_type": "solid_circle",
         "attachment_type": "direct",
-        "k_attachment": 10000000000.0,
+        "k_attachment": 10000000000000.0,
         "sigmoid_eps": 0.1
       },
       "phis_start_cc": null,
@@ -3320,7 +3320,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "140029880996624"
+        "value": "139962812193040"
       },
       "r_beam": 0.06
     },
@@ -3354,7 +3354,7 @@
         "itc": 0.0029
       },
       "problem_options": {
-        "winkler_k": 10000000000.0,
+        "winkler_k": 10000000000000.0,
         "solver": "cudss",
         "adjoint_solver": "cudss"
       },
