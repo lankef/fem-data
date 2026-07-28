@@ -63,9 +63,15 @@ def import_mesh(path: str = MESH_PATH):
         Physical-group tags carried over from gmsh (only the ``"device"``
         volume group is set in the notebook).
     """
-    domain, cell_tags, facet_tags = gmshio.read_from_msh(
+    result = gmshio.read_from_msh(
         path, MPI.COMM_WORLD, rank=0, gdim=3,
     )
+    if isinstance(result, tuple):  # dolfinx <= 0.9
+        domain, cell_tags, facet_tags = result
+    else:  # dolfinx >= 0.10 returns a MeshData object
+        domain = result.mesh
+        cell_tags = result.cell_tags
+        facet_tags = result.facet_tags
     return domain, cell_tags, facet_tags
 
 
