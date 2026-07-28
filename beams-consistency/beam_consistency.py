@@ -30,7 +30,10 @@ from dolfinx import fem
 from dolfinx import mesh as dmesh
 from dolfinx import plot as dfx_plot
 from dolfinx.fem.petsc import LinearProblem
-from dolfinx.io import gmshio
+try:
+    from dolfinx.io import gmshio  # dolfinx <= 0.9
+except ImportError:  # dolfinx >= 0.10 renamed gmshio -> gmsh
+    from dolfinx.io import gmsh as gmshio
 from simsopt import load
 
 MESH_PATH = "full_mesh.msh"
