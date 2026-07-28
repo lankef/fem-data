@@ -187,7 +187,11 @@ def load_eq(file_name):
     plasma_surface_vc.set_dofs(eq.boundary.get_dofs())
     return eq, Bnormal_plasma, plasma_surface_vc, vc
 
-eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
+# Resolved relative to this file (not the caller's CWD) so this module can be
+# imported from other project directories (e.g. beams-optimization/) as well
+# as run from within fixed-continuation/ itself.
+_WOUT_PATH = str(Path(__file__).resolve().parent / 'wout.nc')
+eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq(_WOUT_PATH)
 
 # ----- Loading constant parameters -----
 # Setting targets
@@ -237,7 +241,7 @@ CIRCLE_RADIUS_FACTOR = 3  # circular coil radius R1 = factor * plasma minor radi
 TARGET_QUADPOINTS_PER_COIL = 80  # aim for ~this many quadpoints per base coil
 
 
-def ppp_for_target_quadpoints(order, target=TARGET_QUADPOINTS_PER_COIL):
+def ppp_for_target_quadpoints(order, target=None):
     """Points-per-period so a CurveXYZFourier's ``order*ppp`` quadpoint count is
     as close to ``target`` as possible.
 
@@ -246,7 +250,14 @@ def ppp_for_target_quadpoints(order, target=TARGET_QUADPOINTS_PER_COIL):
     Biot-Savart source resolution and the FEM mesh's phi-slice count in
     coil-fem, so we keep it roughly constant (~``target``) across continuation
     steps instead of letting it grow with ``order`` (a fixed ppp would).
+
+    ``target`` defaults to the *current* value of ``TARGET_QUADPOINTS_PER_COIL``
+    (looked up dynamically, not captured at import time), so callers that
+    import this module and override ``TARGET_QUADPOINTS_PER_COIL`` afterwards
+    (e.g. ``beams-optimization/optimization.py``) still take effect.
     """
+    if target is None:
+        target = TARGET_QUADPOINTS_PER_COIL
     return max(1, int(round(target / order)))
 
 
@@ -274,7 +285,24 @@ def run_filament_free(
         plasma_surface, Bnormal_plasma, 
         MAXITER, force_mode,
         support_type, support_kwargs,
+        mesh_options=mesh_options,
+        material_options=material_options,
+        gravity_options=gravity_options,
+        problem_options=problem_options,
+        physics_options=None,
+        coupling=None,
     ):
+    """Run one filament-free (stress/force-aware) coil optimization.
+
+    ``mesh_options``/``material_options``/``gravity_options``/``problem_options``
+    default to this module's own FEM settings (unchanged behaviour for
+    existing callers).  ``physics_options``/``coupling`` are only forwarded to
+    ``CoilFEMObjective`` when explicitly provided, so callers that don't pass
+    them (this module's own scripts) see the exact same construction as
+    before.  Other modules (e.g. ``beams-optimization/optimization.py``) can
+    override any of these per call to reuse this function with a different
+    FEM/support setup (e.g. ``CoilSupportBeams``).
+    """
 
     import logging
     logging.getLogger('jax_fem').setLevel(logging.WARNING)
@@ -328,8 +356,7 @@ def run_filament_free(
             stellsym=plasma_surface.stellsym,
             **support_kwargs,
         )
-        Jstress = CoilFEMObjective(
-            coil_support,
+        _fem_kwargs = dict(
             metrics          = ('l2_von_mises',),
             metric_weights   = (1.,),
             mesh_options     = mesh_options,
@@ -337,6 +364,11 @@ def run_filament_free(
             gravity_options  = gravity_options,
             problem_options  = problem_options,
         )
+        if physics_options is not None:
+            _fem_kwargs['physics_options'] = physics_options
+        if coupling is not None:
+            _fem_kwargs['coupling'] = coupling
+        Jstress = CoilFEMObjective(coil_support, **_fem_kwargs)
         print('Optimizing max Von Mises')
     Jccdist_actual = CurveCurveDistance(curves_for_ccd, CC_TARGET)
     Jccdist = Jccdist_actual * (1 / CC_TARGET)
@@ -440,6 +472,12 @@ def run_continuation(
         MAXITER, force_mode,
         support_type, support_kwargs,
         fix_geometry=False,
+        mesh_options=mesh_options,
+        material_options=material_options,
+        gravity_options=gravity_options,
+        problem_options=problem_options,
+        physics_options=None,
+        coupling=None,
     ):
     """Fourier-order continuation starting from circular coils.
 
@@ -448,6 +486,10 @@ def run_continuation(
     ``INIT_ORDER``.  The problem is re-optimized ``CONT_STEPS`` times, raising the
     curve order by ``ORDER_INCREMENT`` between steps.  Modelled after
     ``quasi_single_stage/filaments/shared.py:filament_study``.
+
+    ``mesh_options``/.../``coupling`` are forwarded to ``run_filament_free``
+    verbatim each step (see its docstring); defaults reproduce this module's
+    own behaviour unchanged.
     """
     R0 = plasma_surface.major_radius()
     R1 = CIRCLE_RADIUS_FACTOR * plasma_surface.minor_radius()
@@ -476,6 +518,12 @@ def run_continuation(
             force_mode=force_mode,
             support_type=support_type,
             support_kwargs=support_kwargs,
+            mesh_options=mesh_options,
+            material_options=material_options,
+            gravity_options=gravity_options,
+            problem_options=problem_options,
+            physics_options=physics_options,
+            coupling=coupling,
             # flux_norm_target=FLUX_NORM_TARGET,
         )
         nit_list.append(result[2].nit)
