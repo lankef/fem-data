@@ -66,12 +66,12 @@ def import_mesh(path: str = MESH_PATH):
     result = gmshio.read_from_msh(
         path, MPI.COMM_WORLD, rank=0, gdim=3,
     )
-    if isinstance(result, tuple):  # dolfinx <= 0.9
-        domain, cell_tags, facet_tags = result
-    else:  # dolfinx >= 0.10 returns a MeshData object
+    if hasattr(result, "mesh"):  # dolfinx >= 0.10 returns a MeshData object
         domain = result.mesh
-        cell_tags = result.cell_tags
-        facet_tags = result.facet_tags
+        cell_tags = getattr(result, "cell_tags", None)
+        facet_tags = getattr(result, "facet_tags", None)
+    else:  # dolfinx <= 0.9 returns a (mesh, cell_tags, facet_tags) tuple
+        domain, cell_tags, facet_tags = result
     return domain, cell_tags, facet_tags
 
 
