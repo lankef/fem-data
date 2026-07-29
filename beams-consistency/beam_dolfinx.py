@@ -24,6 +24,7 @@ import numpy as np
 import ufl
 import basix.ufl
 import meshio
+import time
 from mpi4py import MPI
 from scipy.spatial import cKDTree
 from dolfinx import fem
@@ -415,12 +416,14 @@ def main():
     nu = float(data["nu"])
     winkler_k = float(data["winkler_k"])
     print(f"solving: E={E:.3e} Pa, nu={nu}, winkler_k={winkler_k:.3e} N/m³")
-
+    time1 = time.time()
     sol = solve_elasticity_winkler(
         domain, f, w, E=E, nu=nu, winkler_k=winkler_k,
     )
     uh = sol["uh"]
     vm = sol["von_mises_Pa"]
+    time2 = time.time()
+    np.save('time_dolfinx', time2-time1)
     print(
         f"|u|_max = "
         f"{np.linalg.norm(uh.x.array.reshape(-1, 3), axis=1).max():.3e} m"
