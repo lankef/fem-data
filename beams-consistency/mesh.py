@@ -183,16 +183,17 @@ def mesh_CoilSupportBeam(Jstress, folder):
     gmsh.write(folder + '/full_mesh.msh')  # portable fallback for a separate dolfinx env
     
     
-    # ### Step 4: body force at mesh nodes (Option B)
+    # ### Step 4: classify nodes + clamp metadata
     # 
     # Inverse-map every gmsh node back into the base-coil $(\varphi, u, v)$ 
-    # parametrisation to separate conductor from beam/steel, evaluate
-    # coil-fem's Lorentz body force there, and write both a plain `.npz` 
-    # (for a separate dolfinx script) and a `save_run_vtu`-style VTU for sanity checking.
+    # parametrisation to separate conductor from beam/steel, evaluate clamp
+    # Winkler weights, and write a plain `.npz` (for ``beam_dolfinx.py``) plus
+    # a VTU for sanity checking.  Lorentz / Biot–Savart body force is **not**
+    # computed here — ``beam_dolfinx.py`` evaluates it at volume quadrature
+    # points on the imported mesh.
     # 
     # **Known limitation.** `occ.fuse` dissolves the coil/beam interface, so 
-    # tets straddle the conductor boundary and the conductor/steel jump in 
-    # $f$ is smeared over one element layer. If that matters for validation, 
+    # tets straddle the conductor boundary. If that matters for validation, 
     # switch upstream to `occ.fragment` (keeps the interface mesh-conforming 
     # and tags volumes directly).
     # 
@@ -361,96 +362,31 @@ def mesh_CoilSupportBeam(Jstress, folder):
     
     
     # ============================================================================
-    # Step 4B: Lorentz body force (+ B fields, Winkler weights) at mesh nodes
+    # Step 4B: Winkler clamp weights + physical clamp centres
     # ============================================================================
-    # Everything is evaluated in the BASE frame and rotated by Q_s at the end.
-    # For non-conductor nodes, B_ext_T is the *total* field (no self-exclusion)
-    # and B_self_T = 0; f_vol gets only gravity (here g_vec = 0).
+    # Clamp weights are evaluated in the BASE frame (same as Support.compute_weights).
+    # Lorentz / Biot–Savart live in beam_dolfinx.py at volume quadrature points.
     
     import jax.numpy as jnp
-    from coil_fem.magnetic import biot_savart, B_self_quadrature, lorentz_body_force
     from coil_fem.coupling import Support
     
-    CHUNK = 32_768
-    
-    base_curves_dofs = [c.dofs for c in Jstress.fem.base_curves_jax]
-    all_gammas, all_gammadashs, all_currents = Jstress.fem._expand_geometry(
-        base_curves_dofs, Jstress.fem.base_currents_jax,
-    )
     curves_jax = Jstress.fem.base_curves_jax
     sdofs = coil_support.support_dofs
-    
-    f_vol = np.zeros((N, 3), dtype=np.float64)
-    B_self_v = np.zeros((N, 3), dtype=np.float64)
-    B_ext_v = np.zeros((N, 3), dtype=np.float64)
     support_weight = np.zeros(N, dtype=np.float64)
     
-    # Base-frame preimages for conductor nodes (needed for biot_savart targets
-    # and compute_weights). Rebuilt from (s, X) via y = X @ Q.
+    # Base-frame preimages for conductor nodes (for compute_weights).
     y_base = np.zeros((N, 3), dtype=np.float64)
     cond = owner_coil >= 0
     if cond.any():
         Qs = Q_list[owner_sym[cond]]
         y_base[cond] = np.einsum('ni,nij->nj', X[cond], Qs)
     
-    
-    def _chunked_biot(targets, currents):
-        """biot_savart in CHUNK-sized batches; returns (n, 3) float64."""
-        out = np.empty((targets.shape[0], 3), dtype=np.float64)
-        tgt = jnp.asarray(targets)
-        cur = jnp.asarray(currents)
-        for lo in range(0, targets.shape[0], CHUNK):
-            hi = min(lo + CHUNK, targets.shape[0])
-            out[lo:hi] = np.asarray(biot_savart(
-                tgt[lo:hi], all_gammas, all_gammadashs, cur,
-            ))
-        return out
-    
-    
-    def _chunked_B_self(fc, I, cross_section, phi_arr, uv_arr):
-        """B_self_quadrature in CHUNK-sized batches; returns (n, 3) float64."""
-        out = np.empty((phi_arr.shape[0], 3), dtype=np.float64)
-        for lo in range(0, phi_arr.shape[0], CHUNK):
-            hi = min(lo + CHUNK, phi_arr.shape[0])
-            phi_b = jnp.asarray(phi_arr[lo:hi])[:, None]
-            uv_b = jnp.asarray(uv_arr[lo:hi])[:, None, :]
-            out[lo:hi] = np.asarray(
-                B_self_quadrature(fc, I, cross_section, phi_b, uv_b)[:, 0]
-            )
-        return out
-    
     t0 = time.time()
     for i in range(n_base):
         sel = np.where(owner_coil == i)[0]
         if sel.size == 0:
             continue
-        mesh = Jstress.fem.meshes[i]
-        fc = mesh.framed_curve
-        curve = fc.curve
-        A = mesh.cross_section_area
-        I = all_currents[i]
-        cross_section = {'shape': 'rect', 'w1': mesh.w1, 'w2': mesh.w2}
-    
-        phi_i = phi_out[sel].astype(np.float64)
-        uv_i = np.stack([u_out[sel], v_out[sel]], axis=1).astype(np.float64)
         y_i = y_base[sel]
-    
-        # Tangent / current density at nodes.
-        gd = np.asarray(curve.gamma_eval(phi_i, 1))
-        t_hat = gd / np.linalg.norm(gd, axis=1, keepdims=True)
-        J = (float(I) / A) * t_hat
-    
-        B_self = _chunked_B_self(fc, I, cross_section, phi_i, uv_i)
-        B_ext = _chunked_biot(y_i, all_currents.at[i].set(0.0))
-        f_base = np.asarray(lorentz_body_force(
-            jnp.asarray(J), jnp.asarray(B_self + B_ext),
-        ))
-    
-        Q_n = Q_list[owner_sym[sel]]
-        f_vol[sel] = np.einsum('nij,nj->ni', Q_n, f_base)
-        B_self_v[sel] = np.einsum('nij,nj->ni', Q_n, B_self)
-        B_ext_v[sel] = np.einsum('nij,nj->ni', Q_n, B_ext)
-    
         # Clamp-only Winkler weights: call the base Support path with clamp
         # dofs so beam attachment weights stay zero on the fused mesh.
         w_g, _w_a = Support.compute_weights(
@@ -464,8 +400,6 @@ def mesh_CoilSupportBeam(Jstress, folder):
         print(f'  coil {i}: {sel.size} nodes')
 
     # Physical-frame clamp centres for dolfinx (analytic Winkler at facet quads).
-    # Distance is Q-invariant, so w(x) = Σ clamp_sigmoid(|x - c_phys|²) matches
-    # the base-frame Support.compute_weights used above.
     phis_clamp = sdofs['phis']
     r_clamp = float(coil_support._r_clamp)
     eps_sigmoid = float(coil_support._sig_eps)
@@ -484,20 +418,7 @@ def mesh_CoilSupportBeam(Jstress, folder):
         f'{clamp_centers.shape[0] // (n_base * n_sym)}), '
         f'r_clamp={r_clamp:.4g}, eps_sigmoid={eps_sigmoid:.4g}'
     )
-    
-    # Beam/steel: total B stored in B_ext_v (B_self stays 0); f_vol Lorentz = 0.
-    beam = owner_coil < 0
-    if beam.any():
-        B_ext_v[beam] = _chunked_biot(X[beam], all_currents)
-        print(f'  beam/steel: {int(beam.sum())} nodes (B_ext = total B)')
-    
-    # Gravity on the whole fused body (steel + conductor).
-    rho = float(material_options['density'])
-    g_vec = np.asarray(gravity_options.get('g_vec', (0.0, 0.0, 0.0)), dtype=np.float64)
-    f_vol += rho * g_vec[None, :]
-    
-    print(f'body force assembled in {time.time() - t0:.1f} s')
-    print(f'|f|_max = {np.linalg.norm(f_vol, axis=1).max():.3e} N/m³')
+    print(f'clamp weights assembled in {time.time() - t0:.1f} s')
     print(f'support_weight range: '
           f'[{support_weight.min():.3g}, {support_weight.max():.3g}]')
     
@@ -547,10 +468,7 @@ def mesh_CoilSupportBeam(Jstress, folder):
         folder + '/body_force.npz',
         points=X,
         node_tags=node_tags,
-        f_vol=f_vol,
         support_weight=support_weight,
-        B_self=B_self_v.astype(np.float32),
-        B_ext=B_ext_v.astype(np.float32),
         owner_coil=owner_coil,
         owner_sym=owner_sym,
         phi=phi_out,
@@ -565,14 +483,14 @@ def mesh_CoilSupportBeam(Jstress, folder):
         r_clamp=np.float64(r_clamp),
         eps_sigmoid=np.float64(eps_sigmoid),
     )
-    print('wrote body_force.npz')
+    print('wrote body_force.npz (no f_vol / B_*; force computed in beam_dolfinx)')
     
     
     # In[17]:
     
     
     # ============================================================================
-    # Step 4D: VTU sanity dump (save_run_vtu field names, point data)
+    # Step 4D: VTU sanity dump (classification + clamp weights)
     # ============================================================================
     # Connectivity from the live gmsh session. gmsh tet10 edge order
     # (01)(12)(02)(03)(23)(13) -> VTK (01)(12)(02)(03)(13)(23).
@@ -589,11 +507,6 @@ def mesh_CoilSupportBeam(Jstress, folder):
         points=X,
         cells=[('tetra10', cells)],
         point_data={
-            'f_vol_Npm3': f_vol,
-            'f_vol_mag_Npm3': np.linalg.norm(f_vol, axis=1),
-            'B_self_T': B_self_v,
-            'B_ext_T': B_ext_v,
-            'B_mag_T': np.linalg.norm(B_self_v + B_ext_v, axis=1),
             'w_clamp': support_weight,
             'k_clamp_Npm3': support_weight * float(support.k_clamp),
             'owner_coil': owner_coil.astype(np.int32),   # -1 = beam/steel
