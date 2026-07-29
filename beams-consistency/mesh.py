@@ -462,6 +462,28 @@ def mesh_CoilSupportBeam(Jstress, folder):
         )
         support_weight[sel] = np.asarray(w_g)
         print(f'  coil {i}: {sel.size} nodes')
+
+    # Physical-frame clamp centres for dolfinx (analytic Winkler at facet quads).
+    # Distance is Q-invariant, so w(x) = Σ clamp_sigmoid(|x - c_phys|²) matches
+    # the base-frame Support.compute_weights used above.
+    phis_clamp = sdofs['phis']
+    r_clamp = float(coil_support._r_clamp)
+    eps_sigmoid = float(coil_support._sig_eps)
+    clamp_centers = []
+    for i in range(n_base):
+        phi_i = np.asarray(phis_clamp[i], dtype=np.float64).ravel()
+        c_base = np.asarray(
+            Jstress.fem.base_curves_jax[i].gamma_eval(phi_i), dtype=np.float64,
+        )
+        for s in range(n_sym):
+            clamp_centers.append(c_base @ Q_list[s].T)
+    clamp_centers = np.vstack(clamp_centers)
+    print(
+        f'clamp_centers: {clamp_centers.shape[0]} '
+        f'(n_base={n_base} x n_sym={n_sym} x n_clamp='
+        f'{clamp_centers.shape[0] // (n_base * n_sym)}), '
+        f'r_clamp={r_clamp:.4g}, eps_sigmoid={eps_sigmoid:.4g}'
+    )
     
     # Beam/steel: total B stored in B_ext_v (B_self stays 0); f_vol Lorentz = 0.
     beam = owner_coil < 0
@@ -539,6 +561,9 @@ def mesh_CoilSupportBeam(Jstress, folder):
         k_clamp=np.float64(support.k_clamp),
         E=np.float64(material_options['E']),
         nu=np.float64(material_options['nu']),
+        clamp_centers=clamp_centers,
+        r_clamp=np.float64(r_clamp),
+        eps_sigmoid=np.float64(eps_sigmoid),
     )
     print('wrote body_force.npz')
     
