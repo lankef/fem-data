@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "139654047255632": {
+    "140693012089936": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654047255632",
+      "@name": "140693012089936",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -535,13 +535,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139654047255632"
+        "value": "140693012089936"
       }
     },
-    "139654047173904": {
+    "140693011991824": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654047173904",
+      "@name": "140693011991824",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -587,7 +587,7 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "139654047173904"
+        "value": "140693011991824"
       }
     },
     "Coil71": {
@@ -604,10 +604,10 @@
         "value": "Current1"
       }
     },
-    "139654047255056": {
+    "140693012089360": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654047255056",
+      "@name": "140693012089360",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1130,7 +1130,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139654047255056"
+        "value": "140693012089360"
       }
     },
     "Coil72": {
@@ -1147,10 +1147,10 @@
         "value": "Current1"
       }
     },
-    "139654046890032": {
+    "140693011707952": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654046890032",
+      "@name": "140693011707952",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1673,7 +1673,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139654046890032"
+        "value": "140693011707952"
       }
     },
     "Coil73": {
@@ -1690,10 +1690,10 @@
         "value": "Current1"
       }
     },
-    "139654046890896": {
+    "140693011708816": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654046890896",
+      "@name": "140693011708816",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2216,7 +2216,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139654046890896"
+        "value": "140693011708816"
       }
     },
     "Coil74": {
@@ -2233,10 +2233,10 @@
         "value": "Current1"
       }
     },
-    "139654047171696": {
+    "140693011989616": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139654047171696",
+      "@name": "140693011989616",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2759,7 +2759,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139654047171696"
+        "value": "140693011989616"
       }
     },
     "Coil75": {
@@ -2776,10 +2776,10 @@
         "value": "Current1"
       }
     },
-    "139652006629968": {
+    "140690971269968": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139652006629968",
+      "@name": "140690971269968",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -3292,14 +3292,14 @@
       "nfp": 5,
       "stellsym": true,
       "beam_options": {
+        "eps_sigmoid": 0.1,
         "n_beam_cc": 4,
         "n_beam_cf": 0,
         "E": 205000000000,
         "nu": 0.3,
         "cross_section_type": "solid_circle",
         "attachment_type": "direct",
-        "k_attachment": 1e+20,
-        "sigmoid_eps": 0.1
+        "k_attachment": 283865289892610.75
       },
       "phis_start_cc": null,
       "phis_end_cc": null,
@@ -3310,7 +3310,9 @@
       "fixed_clamp_options": {
         "enabled": true,
         "r_clamp": 0.34600000000000003,
-        "n_clamp": 2
+        "n_clamp": 2,
+        "E_coil": 205000000000,
+        "k_clamp": 151370860914491.25
       },
       "phis": null,
       "fixed_dof_names": [
@@ -3320,7 +3322,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "139652006629968"
+        "value": "140690971269968"
       },
       "r_beam": 0.06
     },
@@ -3354,7 +3356,6 @@
         "itc": 0.0029
       },
       "problem_options": {
-        "winkler_k": 1e+20,
         "solver": "cudss",
         "adjoint_solver": "cudss"
       },

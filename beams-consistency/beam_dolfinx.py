@@ -155,7 +155,7 @@ def load_body_force(domain, path: str = BODY_FORCE_PATH, *, atol: float = 1e-9):
     return f, w, data
 
 
-def solve_elasticity_winkler(domain, f, w, *, E: float, nu: float, winkler_k: float):
+def solve_elasticity_winkler(domain, f, w, *, E: float, nu: float, k_clamp: float):
     """Solve linear elasticity with a Winkler spring BC on exterior facets.
 
     Reuses the weak form and von Mises post-processing of
@@ -179,8 +179,8 @@ def solve_elasticity_winkler(domain, f, w, *, E: float, nu: float, winkler_k: fl
         Young's modulus [Pa].
     nu : float
         Poisson's ratio.
-    winkler_k : float
-        Foundation modulus [N/m³]; effective spring is ``winkler_k * w``.
+    k_clamp : float
+        Foundation modulus [N/m³]; effective spring is ``k_clamp * w``.
 
     Returns
     -------
@@ -226,7 +226,7 @@ def solve_elasticity_winkler(domain, f, w, *, E: float, nu: float, winkler_k: fl
         subdomain_data=facet_tags, subdomain_id=1,
         metadata={"quadrature_degree": face_quad_deg},
     )
-    a = a + float(winkler_k) * w * ufl.inner(u, v) * ds
+    a = a + float(k_clamp) * w * ufl.inner(u, v) * ds
 
     try:
         problem = LinearProblem(
@@ -287,7 +287,7 @@ def write_result_vtu(
     uh,
     von_mises_Pa: np.ndarray,
     w,
-    winkler_k: float,
+    k_clamp: float,
     f=None,
     B_self: np.ndarray | None = None,
     B_ext: np.ndarray | None = None,
@@ -312,7 +312,7 @@ def write_result_vtu(
         Cell-mean von Mises [Pa] in dolfinx cell order.
     w : dolfinx.fem.Function
         Scalar Winkler weight.
-    winkler_k : float
+    k_clamp : float
         Foundation modulus [N/m³].
     f : dolfinx.fem.Function or None
         Body-force density; written as ``f_vol_Npm3`` when provided.
@@ -347,9 +347,9 @@ def write_result_vtu(
         "displacement_m": np.asarray(
             uh.x.array.reshape(-1, 3)[idx], dtype=np.float64,
         ),
-        "support_weights": np.asarray(w.x.array[idx], dtype=np.float64),
-        "spring_k_Npm3": np.asarray(
-            w.x.array[idx] * float(winkler_k), dtype=np.float64,
+        "w_clamp": np.asarray(w.x.array[idx], dtype=np.float64),
+        "k_clamp_Npm3": np.asarray(
+            w.x.array[idx] * float(k_clamp), dtype=np.float64,
         ),
     }
     if f is not None:
@@ -414,11 +414,12 @@ def main():
 
     E = float(data["E"])
     nu = float(data["nu"])
-    winkler_k = float(data["winkler_k"])
-    print(f"solving: E={E:.3e} Pa, nu={nu}, winkler_k={winkler_k:.3e} N/m³")
-    time1 = time.time()
+
+    k_clamp = float(data["k_clamp"])
+    print(f"solving: E={E:.3e} Pa, nu={nu}, k_clamp={k_clamp:.3e} N/m³")
+
     sol = solve_elasticity_winkler(
-        domain, f, w, E=E, nu=nu, winkler_k=winkler_k,
+        domain, f, w, E=E, nu=nu, k_clamp=k_clamp,
     )
     uh = sol["uh"]
     vm = sol["von_mises_Pa"]
@@ -435,7 +436,7 @@ def main():
 
     write_result_vtu(
         domain, OUT_VTU,
-        uh=uh, von_mises_Pa=vm, w=w, winkler_k=winkler_k, f=f,
+        uh=uh, von_mises_Pa=vm, w=w, k_clamp=k_clamp, f=f,
         B_self=data["B_self"], B_ext=data["B_ext"],
         npz_points=data["points"],
     )
