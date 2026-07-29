@@ -24,6 +24,7 @@ import numpy as np
 import ufl
 import basix.ufl
 import meshio
+import time
 from mpi4py import MPI
 from scipy.spatial import cKDTree
 from dolfinx import fem
@@ -413,6 +414,7 @@ def main():
 
     E = float(data["E"])
     nu = float(data["nu"])
+
     k_clamp = float(data["k_clamp"])
     print(f"solving: E={E:.3e} Pa, nu={nu}, k_clamp={k_clamp:.3e} N/m³")
 
@@ -421,6 +423,8 @@ def main():
     )
     uh = sol["uh"]
     vm = sol["von_mises_Pa"]
+    time2 = time.time()
+    np.save('time_dolfinx', time2-time1)
     print(
         f"|u|_max = "
         f"{np.linalg.norm(uh.x.array.reshape(-1, 3), axis=1).max():.3e} m"
