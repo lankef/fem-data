@@ -451,18 +451,16 @@ def mesh_CoilSupportBeam(Jstress, folder):
         B_self_v[sel] = np.einsum('nij,nj->ni', Q_n, B_self)
         B_ext_v[sel] = np.einsum('nij,nj->ni', Q_n, B_ext)
     
-        # Winkler weights. The dofs override disables the beams 
-        # since compute_weights is implemented primarily for 
-        # staggered solve
-        support_weight[sel] = np.asarray(
-            Support.compute_weights(
-                self=support,
-                coil_idx=i,
-                surface_pts=jnp.asarray(y_i),
-                curves_jax=curves_jax,
-                dofs={'phis': sdofs['phis']}
-            )
+        # Clamp-only Winkler weights: call the base Support path with clamp
+        # dofs so beam attachment weights stay zero on the fused mesh.
+        w_g, _w_a = Support.compute_weights(
+            self=support,
+            coil_idx=i,
+            surface_pts=jnp.asarray(y_i),
+            curves_jax=curves_jax,
+            dofs={'phis': sdofs['phis']},
         )
+        support_weight[sel] = np.asarray(w_g)
         print(f'  coil {i}: {sel.size} nodes')
     
     # Beam/steel: total B stored in B_ext_v (B_self stays 0); f_vol Lorentz = 0.
@@ -538,7 +536,7 @@ def mesh_CoilSupportBeam(Jstress, folder):
         v=v_out,
         rho=np.float64(material_options['density']),
         g_vec=g_vec_save,
-        winkler_k=np.float64(problem_options['winkler_k']),
+        k_clamp=np.float64(support.k_clamp),
         E=np.float64(material_options['E']),
         nu=np.float64(material_options['nu']),
     )
@@ -571,8 +569,8 @@ def mesh_CoilSupportBeam(Jstress, folder):
             'B_self_T': B_self_v,
             'B_ext_T': B_ext_v,
             'B_mag_T': np.linalg.norm(B_self_v + B_ext_v, axis=1),
-            'support_weights': support_weight,
-            'spring_k_Npm3': support_weight * problem_options['winkler_k'],
+            'w_clamp': support_weight,
+            'k_clamp_Npm3': support_weight * float(support.k_clamp),
             'owner_coil': owner_coil.astype(np.int32),   # -1 = beam/steel
             'owner_sym': owner_sym.astype(np.int32),
         },
