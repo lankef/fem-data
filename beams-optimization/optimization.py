@@ -37,7 +37,6 @@ material_options = _fem_obj_spec['material_options']
 gravity_options  = _fem_obj_spec['gravity_options']
 problem_options  = dict(_fem_obj_spec['problem_options'])
 # Drop pre-moduli-split key if an older Jstress.json is still on disk.
-problem_options.pop('winkler_k', None)
 physics_options  = _fem_obj_spec['physics_options']
 coupling         = _fem_obj_spec['coupling']
 
