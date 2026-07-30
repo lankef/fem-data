@@ -29,14 +29,13 @@ _fem_obj_spec = _jstress_objs['CoilFEMObjective1']
 _support_spec = _jstress_objs['CoilSupportBeams1']
 
 # Mesh / material / gravity / solver / physics options forwarded to
-# CoilFEMObjective -- identical to Jstress.json (gravity is zero there).
-# Clamp/attachment Winkler moduli live on the Support (via beam_options /
-# fixed_clamp_options), not in problem_options.
+# CoilFEMObjective -- identical to Jstress.json (canonical snapshot from
+# beams-consistency/mesh.ipynb). Clamp/attachment Winkler moduli live on
+# the Support (via beam_options / fixed_clamp_options), not in problem_options.
 mesh_options     = _fem_obj_spec['mesh_options']
 material_options = _fem_obj_spec['material_options']
 gravity_options  = _fem_obj_spec['gravity_options']
 problem_options  = dict(_fem_obj_spec['problem_options'])
-# Drop pre-moduli-split key if an older Jstress.json is still on disk.
 physics_options  = _fem_obj_spec['physics_options']
 coupling         = _fem_obj_spec['coupling']
 
@@ -45,18 +44,9 @@ coupling         = _fem_obj_spec['coupling']
 # thetas_orientation_cc fixed, fixed clamps enabled).
 # ``beam_options['k_attachment']`` and ``fixed_clamp_options['k_clamp']``
 # are the attachment / clamp moduli [N/m³] from the consistency case.
-_beam_options = dict(_support_spec['beam_options'])
-if 'sigmoid_eps' in _beam_options and 'eps_sigmoid' not in _beam_options:
-    _beam_options['eps_sigmoid'] = _beam_options.pop('sigmoid_eps')
-_fixed_clamp_options = dict(_support_spec['fixed_clamp_options'])
-if (
-    'sigmoid_eps' in _fixed_clamp_options
-    and 'eps_sigmoid' not in _fixed_clamp_options
-):
-    _fixed_clamp_options['eps_sigmoid'] = _fixed_clamp_options.pop('sigmoid_eps')
 beam_support_kwargs = dict(
-    beam_options        = _beam_options,
-    fixed_clamp_options = _fixed_clamp_options,
+    beam_options        = dict(_support_spec['beam_options']),
+    fixed_clamp_options = dict(_support_spec['fixed_clamp_options']),
     fixed_dof_names     = tuple(_support_spec['fixed_dof_names']),
     r_beam              = _support_spec['r_beam'],
 )

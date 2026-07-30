@@ -44,11 +44,12 @@ mesh_options = dict(
     mesh_type    = 'TET10',
 )
 
-# Winkler BC and linear-solver settings.
+# Linear-solver settings. Clamp/attachment Winkler moduli live on the
+# Support (fixed_clamp_options['k_clamp'] / beam_options['k_attachment']),
+# not in problem_options — see beams-consistency/mesh.ipynb.
 problem_options = dict(
-    winkler_k      = 1e10,    # Winkler spring stiffness [N/m³]
-    solver         = 'cudss', # A CPU sparse solver. Future version 
-    adjoint_solver = 'cudss', # will support cuSparse GPU sparse solvers.
+    solver         = 'cudss', # GPU sparse direct solver (cuDSS).
+    adjoint_solver = 'cudss',
 )
 
 # Material settings
