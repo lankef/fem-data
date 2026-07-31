@@ -1,7 +1,6 @@
 from optimization import (
     load_eq,
     run_continuation,
-    k_clamp,
 )
 
 # Loading config from simsopt
@@ -38,7 +37,7 @@ time1 = time.time()
     support_type=CoilSupportTopBottom,
     support_kwargs={
         'fixed_clamp_options': {
-            'k_clamp': k_clamp,
+            'E_coil': material_options['E'],
             'r_clamp': 0.3,
         },
     },

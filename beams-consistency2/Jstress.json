@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "139777906745776": {
+    "140378395206352": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139777906745776",
+      "@name": "140378395206352",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -535,13 +535,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "139777906745776"
+        "value": "140378395206352"
       }
     },
-    "139777906691536": {
+    "140378395151728": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139777906691536",
+      "@name": "140378395151728",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -587,13 +587,13 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "139777906691536"
+        "value": "140378395151728"
       }
     },
-    "Coil71": {
+    "Coil72": {
       "@module": "simsopt.field.coil",
       "@class": "Coil",
-      "@name": "Coil71",
+      "@name": "Coil72",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "curve": {
         "$type": "ref",
@@ -604,10 +604,10 @@
         "value": "Current1"
       }
     },
-    "139776738976752": {
+    "140378249635376": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "139776738976752",
+      "@name": "140378249635376",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -616,20 +616,12 @@
         "data": [
           0.0,
           0.5,
-          0.875,
-          0.625,
-          0.875,
-          0.625,
-          0.125,
-          0.375,
-          0.125,
-          0.375,
-          0.006,
-          0.006,
-          0.006,
-          0.006,
-          0.0,
-          0.0,
+          0.75,
+          0.75,
+          0.25,
+          0.25,
+          0.06,
+          0.06,
           0.0,
           0.0
         ]
@@ -644,15 +636,7 @@
         "x6",
         "x7",
         "x8",
-        "x9",
-        "x10",
-        "x11",
-        "x12",
-        "x13",
-        "x14",
-        "x15",
-        "x16",
-        "x17"
+        "x9"
       ],
       "free": {
         "@module": "numpy",
@@ -665,14 +649,6 @@
           true,
           true,
           true,
-          true,
-          true,
-          true,
-          true,
-          false,
-          false,
-          false,
-          false,
           false,
           false,
           false,
@@ -684,14 +660,6 @@
         "@class": "array",
         "dtype": "float64",
         "data": [
-          -Infinity,
-          -Infinity,
-          -Infinity,
-          -Infinity,
-          -Infinity,
-          -Infinity,
-          -Infinity,
-          -Infinity,
           -Infinity,
           -Infinity,
           -Infinity,
@@ -718,14 +686,6 @@
           Infinity,
           Infinity,
           Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
           Infinity
         ]
       }
@@ -738,14 +698,14 @@
       "base_coils": [
         {
           "$type": "ref",
-          "value": "Coil71"
+          "value": "Coil72"
         }
       ],
       "nfp": 5,
       "stellsym": true,
       "beam_options": {
         "eps_sigmoid": 0.1,
-        "n_beam_cc": 4,
+        "n_beam_cc": 1,
         "n_beam_cf": 0,
         "E": 205000000000,
         "nu": 0.3,
@@ -764,7 +724,7 @@
         "r_clamp": 0.17300000000000001,
         "n_clamp": 2,
         "E_coil": 205000000000,
-        "k_clamp": 1.5066186991893306e+16
+        "k_clamp": 1.5066186991893304e+16
       },
       "phis": null,
       "fixed_dof_names": [
@@ -774,9 +734,9 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "139776738976752"
+        "value": "140378249635376"
       },
-      "r_beam": 0.006
+      "r_beam": 0.06
     },
     "CoilFEMObjective1": {
       "@module": "coil_fem.simsopt.objectives",
