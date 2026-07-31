@@ -73,3 +73,4 @@ save(
     filename='data_support.json'
 )
 save([Jstress], 'Jstress_support.json')
+Jstress.save_run_vtu('support_run')

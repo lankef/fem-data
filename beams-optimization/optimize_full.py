@@ -67,3 +67,4 @@ save(
     filename='data_full.json'
 )
 save([Jstress], 'Jstress_full.json')
+Jstress.save_run_vtu('full_run')
