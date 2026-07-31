@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "140378395206352": {
+    "140462590665136": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140378395206352",
+      "@name": "140462590665136",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -535,13 +535,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140378395206352"
+        "value": "140462590665136"
       }
     },
-    "140378395151728": {
+    "140462590594128": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140378395151728",
+      "@name": "140462590594128",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -587,13 +587,13 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "140378395151728"
+        "value": "140462590594128"
       }
     },
-    "Coil72": {
+    "Coil71": {
       "@module": "simsopt.field.coil",
       "@class": "Coil",
-      "@name": "Coil72",
+      "@name": "Coil71",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "curve": {
         "$type": "ref",
@@ -604,10 +604,10 @@
         "value": "Current1"
       }
     },
-    "140378249635376": {
+    "140462587653360": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140378249635376",
+      "@name": "140462587653360",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -698,7 +698,7 @@
       "base_coils": [
         {
           "$type": "ref",
-          "value": "Coil72"
+          "value": "Coil71"
         }
       ],
       "nfp": 5,
@@ -734,7 +734,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "140378249635376"
+        "value": "140462587653360"
       },
       "r_beam": 0.06
     },
@@ -765,7 +765,7 @@
         "E": 205000000000,
         "nu": 0.3,
         "density": 8000,
-        "itc": 0.0029
+        "itc": 0.0
       },
       "problem_options": {
         "solver": "cudss",
