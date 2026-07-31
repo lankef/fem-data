@@ -33,12 +33,12 @@ from coil_fem.simsopt            import CoilSupportFixed, CoilSupportTopBottom
 
 # ----- FEM options -----
 
-# Rectangular 100 mm × 50 mm cross-section (half-widths in metres).
+# Rectangular cross-section (full-widths in metres).
 # A single dict is broadcast to all base coils automatically.
 mesh_options = dict(
     shape        = 'rect',
-    w1           = 0.2,   # 0.20 m half-width
-    w2           = 0.2,   # 0.20 m half-width
+    w1           = 0.2,   # 0.20 m full-width
+    w2           = 0.2,   # 0.20 m full-width
     frame        = 'rmf',
     aspect_ratio = 1.0,   # aim for cubic elements
     mesh_type    = 'TET10',
@@ -79,13 +79,17 @@ material_options = dict(
 )
 
 # Gravity body-force options (None disables the gravity load).
+# Density always comes from material_options; only g_vec is read here.
 if _grav.get('enabled', False):
     gravity_options = dict(
-        density = float(_mat['density_kg_m3']),
-        g_vec   = tuple(float(c) for c in _grav['g_vec_m_s2']),
+        g_vec = tuple(float(c) for c in _grav['g_vec_m_s2']),
     )
 else:
     gravity_options = None
+
+# Default grounded-clamp Winkler modulus [N/m³] used by optimize_fixed /
+# optimize_movable via fixed_clamp_options['k_clamp'].
+k_clamp = 1e10
 
 # Backward-compatible aliases: existing notebooks import these names.  Both now
 # point at the single JSON-sourced dict (thermal itc included).

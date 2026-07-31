@@ -23,25 +23,27 @@ from coil_fem.geo import CurveXYZFourierJAX
 from coil_fem.geo import make_centroid_frame, make_rmf_frame  # noqa: F401
 from coil_fem.meshing import rectangle_sweep, disk_sweep  # noqa: F401
 from coil_fem import CoilFEM
-from coil_fem.coupling import SupportFixed
+from coil_fem.coupling import Support
 
 # ── Physics / solver options ──────────────────────────────────────────────────
-# Rectangular cross-section (half-widths in metres).
+# Rectangular cross-section (full-widths in metres).
 mesh_options = dict(
     shape        = 'rect',
-    w1           = 0.2,   # 0.20 m half-width
-    w2           = 0.2,   # 0.20 m half-width
+    w1           = 0.2,   # 0.20 m full-width
+    w2           = 0.2,   # 0.20 m full-width
     frame        = 'rmf',
     aspect_ratio = 1.0,   # aim for cubic elements
     mesh_type    = 'TET10',
 )
 
-# Winkler BC and linear-solver settings.
+# Linear-solver settings. Winkler modulus lives on Support (k_clamp), not here.
 problem_options = dict(
-    winkler_k      = 1e10,      # Winkler spring stiffness [N/m³]
     # solver         = 'jax',     # JAX solver. (GPU). Default solver is UMFPack (CPU)
     # adjoint_solver = 'jax',
 )
+
+# Grounded Winkler spring stiffness [N/m³] for the top/bottom soft clamps.
+k_clamp = 1e10
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Material, thermal-contraction and gravity parameters are centralised in
@@ -69,27 +71,28 @@ material_options = dict(
 )
 
 # Gravity body-force options (None disables the gravity load).
+# Density always comes from material_options; only g_vec is read here.
 if _grav.get('enabled', False):
     gravity_options = dict(
-        density = float(_mat['density_kg_m3']),
-        g_vec   = tuple(float(c) for c in _grav['g_vec_m_s2']),
+        g_vec = tuple(float(c) for c in _grav['g_vec_m_s2']),
     )
 else:
     gravity_options = None
 
 # ── Support-function geometry ─────────────────────────────────────────────────
-# Clamp radius = 2 × coil half-width; sigmoid sharpness tuned to clamp_radius.
-clamp_radius = 0.3 # 2 * max(mesh_options['w1'], mesh_options['w2'])
-sigmoid_beta  = 20.0 / clamp_radius
+# Soft-sphere clamps at the coil top/bottom (same geometry as CoilSupportTopBottom).
+# Kept as an explicit Support(fixed_clamp_fns=...) for the raw CoilFEM path.
+clamp_radius = 0.3  # [m]
+sigmoid_beta = 20.0 / clamp_radius
 
 
 def support_fn(
-    surface_points: jax.Array,   # (n_surface_nodes, 3)  traced
-    coil: 'CurveXYZFourierJAX',  # current coil geometry
+    surface_points: jax.Array,   # (N, 3)  traced
+    curve_jax: 'CurveXYZFourierJAX',
     dofs: dict | None,           # optimisable support params (or None)
-) -> jax.Array:                  # (n_surface_nodes,) weights in [0, 1]
+) -> jax.Array:                  # (N,) weights in [0, 1]
     """Soft-sphere support at top and bottom of the coil centreline."""
-    gamma  = coil.gamma()                              # (n_quad, 3)
+    gamma  = curve_jax.gamma()                         # (n_quad, 3)
     top    = gamma[jnp.argmax(gamma[:, 2])]            # (3,) highest point
     bottom = gamma[jnp.argmin(gamma[:, 2])]            # (3,) lowest point
 
@@ -172,8 +175,8 @@ def run_one_n_quadpoints(
         mesh_options     = mesh_options,
         material_options = material_options,
         gravity_options  = gravity_options,
-        support          = SupportFixed(support_fns=support_fn),
-        problem_options  = problem_options|{'solver':solver, 'adjoint_solver':solver},
+        support          = Support(k_clamp=k_clamp, fixed_clamp_fns=support_fn),
+        problem_options  = {**problem_options, 'solver': solver, 'adjoint_solver': solver},
     )
     fem.save_support_vtu(str(out_dir), prefix="coil_")
     result = None
@@ -1033,30 +1036,44 @@ def _spring_k_node_array(
     coil_fem: "CoilFEM",
     i: int,
     pts_i: np.ndarray,
-    dofs_i,
-    support_dofs_i,
-) -> np.ndarray:
-    """Return spring stiffness at every mesh node for base coil ``i``.
+    support_dofs: dict | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return spring stiffness and clamp weight at every mesh node for coil ``i``.
 
-    Nodes not on the Winkler surface carry stiffness 0.
+    Nodes not on the Winkler surface carry stiffness / weight 0.
 
     Returns
     -------
-    np.ndarray, (n_nodes,) [N/m³]
+    k_nodes : np.ndarray, (n_nodes,) [N/m³]
+    w_clamp : np.ndarray, (n_nodes,) dimensionless grounded-clamp weight
     """
-    if not getattr(coil_fem.support, '_support_fns', None):
-        return np.zeros(pts_i.shape[0], dtype=np.float64)
+    n_nodes = pts_i.shape[0]
+    k_nodes = np.zeros(n_nodes, dtype=np.float64)
+    w_clamp = np.zeros(n_nodes, dtype=np.float64)
 
-    winkler_k = float(coil_fem.problem_options["winkler_k"])
-    surf_idx  = np.asarray(coil_fem.pipelines[i].surface_node_indices, dtype=np.int32)
-    weights   = np.asarray(
-        coil_fem._compute_support_weights(i, pts_i, dofs_i, support_dofs_i),
-        dtype=np.float64,
+    if (
+        float(coil_fem.support.k_clamp) == 0.0
+        and float(coil_fem.support.k_attachment) == 0.0
+    ):
+        return k_nodes, w_clamp
+
+    surf_idx = np.asarray(
+        coil_fem.pipelines[i].surface_node_indices, dtype=np.int32,
     )
-
-    k_nodes = np.zeros(pts_i.shape[0], dtype=np.float64)
-    k_nodes[surf_idx] = weights * winkler_k
-    return k_nodes
+    w_g, w_a = coil_fem._support_weights(
+        i,
+        jnp.asarray(pts_i),
+        coil_fem.base_curves_jax,
+        support_dofs,
+        at='nodes',
+    )
+    w_g_np = np.asarray(w_g, dtype=np.float64)
+    k_surf = np.asarray(
+        coil_fem.support.stiffness(w_g, w_a), dtype=np.float64,
+    )
+    w_clamp[surf_idx] = w_g_np
+    k_nodes[surf_idx] = k_surf
+    return k_nodes, w_clamp
 
 
 # ============================================================================
@@ -1084,8 +1101,8 @@ def _write_vtu(
 
     point_data: dict = {"displacement_m": displacement}
     if np.any(spring_k_nodes > 0):
-        point_data["support_weights"] = support_weights
-        point_data["spring_k_Npm3"]  = spring_k_nodes
+        point_data["w_clamp"] = support_weights
+        point_data["k_clamp_Npm3"] = spring_k_nodes
 
     cell_data: dict = {
         "von_mises_MPa": [vm_mpa],
@@ -1147,9 +1164,6 @@ def _run_dolfinx_pipeline(
     os.makedirs(out_subdir, exist_ok=True)
 
     n_base = len(coil_fem.base_curves_jax)
-    base_curves_dofs = [c.dofs for c in coil_fem.base_curves_jax]
-    # _validate_support_dofs(None, n_base) returns [None] * n_base
-    support_dofs: list = [None] * n_base
 
     # Material
     E   = coil_fem._E
@@ -1163,9 +1177,9 @@ def _run_dolfinx_pipeline(
         eps_th = -np.eye(3, dtype=np.float64) * itc
         print(f"  Thermal eigenstrain active: itc={itc}, eps_th[0,0]={eps_th[0,0]:.4e}")
 
-    # Gravity
+    # Gravity: density always from material_options; g_vec from gravity_options.
     if coil_fem.gravity_options is not None:
-        grav_rho = float(coil_fem.gravity_options.get("density", rho))
+        grav_rho = float(rho)
         g_vec    = np.asarray(
             coil_fem.gravity_options.get("g_vec", (0.0, 0.0, -9.80665)),
             dtype=np.float64,
@@ -1183,6 +1197,9 @@ def _run_dolfinx_pipeline(
     Bself_out:    list = []
     Bext_out:     list = []
 
+    # Grounded Support has no optimisable dofs; None is the correct merged dict.
+    support_dofs_merged = None
+
     for i in range(n_base):
         print(f"\n[{label}] base coil {i} ...")
         bd      = base_data[i]
@@ -1192,7 +1209,6 @@ def _run_dolfinx_pipeline(
         n_quads = bd["n_quads"]
         A_i     = bd["A"]
         I_i     = float(coil_fem.base_currents_jax[i])
-        dofs_i  = base_curves_dofs[i]
 
         # J at quad points: (I/A) * t_hat_q
         J_q = (I_i / A_i) * bd["t_hat_q"]  # (n_cells, n_quads, 3)
@@ -1210,19 +1226,10 @@ def _run_dolfinx_pipeline(
         # The dolfinx solve now receives the full per-Gauss-point array.
         f_vol_cell_mean = f_vol_q.mean(axis=1)  # (n_cells, 3)
 
-        # Spring stiffness at mesh nodes
-        import jax.numpy as jnp
-        spring_k_nodes = _spring_k_node_array(
-            coil_fem, i, jnp.asarray(pts_np), dofs_i, support_dofs[i]
+        # Spring stiffness + clamp weight at mesh nodes
+        spring_k_nodes_np, support_weights_np = _spring_k_node_array(
+            coil_fem, i, pts_np, support_dofs_merged,
         )
-        spring_k_nodes_np = np.asarray(spring_k_nodes)
-
-        # Support weights (unscaled) for VTU output
-        if getattr(coil_fem.support, '_support_fns', None):
-            winkler_k   = float(coil_fem.problem_options["winkler_k"])
-            support_weights_np = spring_k_nodes_np / (winkler_k + 1e-300)
-        else:
-            support_weights_np = np.zeros(pts_np.shape[0], dtype=np.float64)
 
         # ── dolfinx solve ────────────────────────────────────────────────────
         t0     = time.perf_counter()
@@ -1509,13 +1516,15 @@ def validate_with_dolfinx(
     """
     _require_dolfinx()
 
-    if not getattr(coil_fem.support, '_support_fns', None):
+    if (
+        float(coil_fem.support.k_clamp) == 0.0
+        and float(coil_fem.support.k_attachment) == 0.0
+    ):
         import warnings
         warnings.warn(
-            "CoilFEM has no support functions — no Winkler BC will be applied in "
-            "dolfinx.  The system may be singular unless the body force alone "
-            "determines the deformation uniquely (e.g. self-equilibrated load).  "
-            "If JAX-FEM uses Dirichlet BCs you must add them here manually.",
+            "CoilFEM support has k_clamp=k_attachment=0 — no Winkler BC will be "
+            "applied in dolfinx.  The system may be singular unless the body "
+            "force alone determines the deformation uniquely.",
             stacklevel=2,
         )
 
