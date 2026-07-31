@@ -72,7 +72,7 @@ _fc_spec.loader.exec_module(_fc)
 # ``ppp_for_target_quadpoints``/``increase_base_curve_order`` in the imported
 # module look this global up dynamically (not captured at import time), so
 # overriding it here takes effect immediately for every call below.
-_fc.TARGET_QUADPOINTS_PER_COIL = 80 # 160
+_fc.TARGET_QUADPOINTS_PER_COIL = 110 # 160
 
 # Re-exported unchanged.
 load_eq = _fc.load_eq
