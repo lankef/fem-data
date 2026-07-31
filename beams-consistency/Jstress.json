@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "140230299601904": {
+    "140091066704304": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299601904",
+      "@name": "140091066704304",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -535,13 +535,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140230299601904"
+        "value": "140091066704304"
       }
     },
-    "140230299520464": {
+    "140091066649680": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299520464",
+      "@name": "140091066649680",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -587,7 +587,7 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "140230299520464"
+        "value": "140091066649680"
       }
     },
     "Coil71": {
@@ -604,10 +604,10 @@
         "value": "Current1"
       }
     },
-    "140230299601328": {
+    "140091066704880": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299601328",
+      "@name": "140091066704880",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1130,7 +1130,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140230299601328"
+        "value": "140091066704880"
       }
     },
     "Coil72": {
@@ -1147,10 +1147,10 @@
         "value": "Current1"
       }
     },
-    "140230299219728": {
+    "140091066707472": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299219728",
+      "@name": "140091066707472",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -1673,7 +1673,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140230299219728"
+        "value": "140091066707472"
       }
     },
     "Coil73": {
@@ -1690,10 +1690,10 @@
         "value": "Current1"
       }
     },
-    "140230299220592": {
+    "140091066709776": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299220592",
+      "@name": "140091066709776",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2216,7 +2216,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140230299220592"
+        "value": "140091066709776"
       }
     },
     "Coil74": {
@@ -2233,10 +2233,10 @@
         "value": "Current1"
       }
     },
-    "140230299517872": {
+    "140091066710928": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140230299517872",
+      "@name": "140091066710928",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -2759,7 +2759,7 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "140230299517872"
+        "value": "140091066710928"
       }
     },
     "Coil75": {
@@ -2776,10 +2776,10 @@
         "value": "Current1"
       }
     },
-    "140229130132592": {
+    "140091064330256": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "140229130132592",
+      "@name": "140091064330256",
       "@version": "1.10.7.dev408+gdaa3fce7a",
       "x": {
         "@module": "numpy",
@@ -3299,7 +3299,7 @@
         "nu": 0.3,
         "cross_section_type": "solid_circle",
         "attachment_type": "direct",
-        "k_attachment": 283865289892610.75
+        "k_attachment": 279557558559452.25
       },
       "phis_start_cc": null,
       "phis_end_cc": null,
@@ -3322,7 +3322,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "140229130132592"
+        "value": "140091064330256"
       },
       "r_beam": 0.06
     },
@@ -3353,7 +3353,7 @@
         "E": 205000000000,
         "nu": 0.3,
         "density": 8000,
-        "itc": 0.0029
+        "itc": 0.0
       },
       "problem_options": {
         "solver": "cudss",
