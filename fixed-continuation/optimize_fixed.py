@@ -1,6 +1,7 @@
 from optimization import (
     load_eq,
     run_continuation,
+    material_options
 )
 
 # Loading config from simsopt
