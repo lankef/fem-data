@@ -24,6 +24,9 @@ stellsym = True
 import logging
 logging.getLogger('jax_fem').setLevel(logging.WARNING)
 
+for cur in base_currents:
+    cur.fix_all()
+    
 # Coil geometry starts from circles (via run_continuation) and is optimized
 # together with the currents and the CoilSupportBeams beam-network dofs.
 time1 = time.time()
