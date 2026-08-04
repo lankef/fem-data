@@ -10,21 +10,29 @@
 #   2) --drop-winkler-wa
 #   3) --simsopt-free
 #   4) --compare-wa-slice   (rebuilds a fresh problem for no-w_a; no mid-JIT patch)
-#   5) --vjp-ablation {freeze_k|freeze_sdofs_geom}
+#   5) --vjp-ablation {freeze_k|freeze_sdofs_geom|freeze_wa_in_k|freeze_wa_in_coupling}
 #   6) --diagnostics        (5-coil kitchen-sink: fingerprint, full/no-wa,
 #                            wa-slice, DOF-group masks, k(φ) check, simsopt-free)
+#   7) --diagnostics-deep PHASE  (phased deep suite; see notes/WINKLER_WA_VJP.md)
+#        groups | residual | ablation | ablation-sum | surgical | ift | scale
 #
 # Examples:
 #   python -u ./taylor.py
 #   python -u ./taylor.py --diagnostics
+#   python -u ./taylor.py --diagnostics-deep groups
+#   python -u ./taylor.py --diagnostics-deep residual
+#   python -u ./taylor.py --diagnostics-deep ablation --vjp-ablation freeze_k
 #   python -u ./taylor.py --compare-wa-slice
 #   python -u ./taylor.py --drop-winkler-wa
 #   sbatch jobscript_taylor.sh --diagnostics
+#   sbatch jobscript_taylor.sh --diagnostics-deep residual
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -72,7 +80,13 @@ def parse_args():
     )
     p.add_argument(
         "--vjp-ablation",
-        choices=("none", "freeze_k", "freeze_sdofs_geom"),
+        choices=(
+            "none",
+            "freeze_k",
+            "freeze_sdofs_geom",
+            "freeze_wa_in_k",
+            "freeze_wa_in_coupling",
+        ),
         default="none",
         help="Probe 5: set COIL_FEM_VJP_ABLATION before building CoilFEM.",
     )
@@ -80,6 +94,20 @@ def parse_args():
         "--diagnostics",
         action="store_true",
         help="Probe 6: full 5-coil diagnostic suite (see module docstring).",
+    )
+    p.add_argument(
+        "--diagnostics-deep",
+        choices=(
+            "groups",
+            "residual",
+            "ablation",
+            "ablation-sum",
+            "surgical",
+            "ift",
+            "scale",
+        ),
+        default=None,
+        help="Probe 7: phased deep diagnostics (one phase per job).",
     )
     p.add_argument(
         "--eps",
@@ -99,6 +127,12 @@ def parse_args():
         type=int,
         default=5,
         help="Number of W7-X base coils (default 5).",
+    )
+    p.add_argument(
+        "--ablation-dir",
+        type=str,
+        default="logs",
+        help="Directory for deep-ablation JSON artifacts (ablation / ablation-sum).",
     )
     return p.parse_args()
 
@@ -525,7 +559,7 @@ def run_k_phi_grad_check(Jstress, coil_support, dofs, h, eps=1e-6):
 
 
 def run_dof_group_probes(Jstress, coil_support, dofs, h, eps_list, dJ_full):
-    """Taylor along h masked to individual support DOF groups."""
+    """Taylor along h masked to individual support DOF groups (full multi-ε)."""
     print(f"\n{'#' * 80}\n### DOF-group directional probes\n{'#' * 80}\n", flush=True)
     fun = make_simsopt_fun(Jstress)
     keys = ("phis_start_cc", "phis_end_cc", "phis")
@@ -536,6 +570,9 @@ def run_dof_group_probes(Jstress, coil_support, dofs, h, eps_list, dJ_full):
     masks["other"] = ~covered
 
     dJ_full = np.asarray(dJ_full, dtype=float).reshape(-1)
+    h = np.asarray(h, dtype=float).reshape(-1)
+    dJh_full_dir = float(np.dot(dJ_full, h))
+    eps_lo = float(min(eps_list))
     group_ratios = {}
     for name, mask in masks.items():
         n = int(mask.sum())
@@ -543,27 +580,813 @@ def run_dof_group_probes(Jstress, coil_support, dofs, h, eps_list, dJ_full):
             print(f"  {name:16s}  n_free=0  (skip)", flush=True)
             group_ratios[name] = float("nan")
             continue
-        h_g = np.asarray(h, dtype=float) * mask.astype(float)
-        dJh_g = float(np.dot(dJ_full, h_g))
-        # Single-eps plateau-style FD at smallest eps for cost control, plus
-        # one larger eps for Richardson glance.
-        eps_use = sorted(eps_list)
-        eps_lo = eps_use[-1]
+        h_g = h * mask.astype(float)
         Jstress.x = dofs
-        Jp, _ = fun(dofs + eps_lo * h_g)
-        Jm, _ = fun(dofs - eps_lo * h_g)
-        fd = (Jp - Jm) / (2.0 * eps_lo)
-        ratio = dJh_g / fd if fd != 0 else float("nan")
-        frac = dJh_g / float(np.dot(dJ_full, h)) if np.dot(dJ_full, h) != 0 else float("nan")
+        dJh_g, fd_g, _, _, meta_g = run_taylor(
+            f"DOF-group {name}",
+            fun,
+            dofs,
+            h_g,
+            eps_list,
+        )
+        ratio = dJh_g / fd_g if fd_g else float("nan")
+        frac = dJh_g / dJh_full_dir if dJh_full_dir != 0 else float("nan")
         print(
             f"  {name:16s}  n_free={n:3d}  dJh={dJh_g:.6e}  "
-            f"FD({eps_lo:.0e})={fd:.6e}  dJh/FD={ratio:.8f}  "
+            f"FD(plateau/eps={eps_lo:.0e})={fd_g:.6e}  dJh/FD={ratio:.8f}  "
             f"dJh/dJh_full={frac:.6f}",
             flush=True,
         )
         group_ratios[name] = ratio
         Jstress.x = dofs
     return group_ratios
+
+
+def _ablation_json_path(ablation_dir: str, ablation: str, n_coils: int, seed: int) -> Path:
+    return Path(ablation_dir) / f"deep_ablation_{ablation}_n{n_coils}_s{seed}.json"
+
+
+def _sol_flat_from_run(fem, out):
+    """Concatenate coil displacements + support DOFs into merged sol_flat."""
+    static = fem.monolithic_static
+    parts = []
+    for i, u in enumerate(out["displacements"]):
+        parts.append(jnp.asarray(u).reshape(-1))
+    u_s = out["u_s"]
+    if u_s is None:
+        raise RuntimeError("expected coupled solve with u_s")
+    parts.append(jnp.asarray(u_s).reshape(-1))
+    sol = jnp.concatenate(parts)
+    if int(sol.shape[0]) != int(static.n_total_dofs):
+        raise RuntimeError(
+            f"sol_flat length {sol.shape[0]} != n_total_dofs {static.n_total_dofs}"
+        )
+    return sol
+
+
+def _pack_free_helpers(coil_support, dofs):
+    free_mask = np.asarray(coil_support.local_dofs_free_status, dtype=bool)
+    free_idx = np.flatnonzero(free_mask)
+    x_full0 = np.asarray(coil_support.local_full_x, dtype=float)
+    unravel = coil_support._unravel
+    x0 = jnp.asarray(dofs, dtype=jnp.float64)
+
+    def sdofs_from_free(x_free):
+        x_full = jnp.asarray(x_full0).at[free_idx].set(x_free)
+        return unravel(x_full)
+
+    return free_idx, x_full0, sdofs_from_free, x0
+
+
+def run_deep_groups(args):
+    """Phase 0: full-model Taylor + multi-ε DOF-group localization."""
+    fp = print_coil_fem_fingerprint()
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    print_adjoint_diagnostics(J, args.force_kt_adjoint)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    fun = make_simsopt_fun(J)
+    dJh, fd, _, dJ, _ = run_taylor("DEEP groups: full model", fun, dofs, h, args.eps)
+    J.x = dofs
+    group_ratios = run_dof_group_probes(J, cs, dofs, h, args.eps, dJ)
+    ratio = dJh / fd if fd else float("nan")
+    print("\n=== DEEP DIAG PHASE groups SUMMARY ===", flush=True)
+    print(f"fingerprint: drivers={fp['drivers']}", flush=True)
+    print(f"k_live_in_drivers: {fp['k_live_in_drivers']}", flush=True)
+    print(f"n_coils: {args.n_coils}", flush=True)
+    print(f"baseline_dJh_over_FD: {ratio:.8f}", flush=True)
+    print(
+        "group_ratios: "
+        + " ".join(f"{k}={v:.8f}" for k, v in group_ratios.items()),
+        flush=True,
+    )
+
+
+def run_deep_residual(args):
+    """Phase 1: frozen-u* residual FD vs VJP (coil / coupling / full)."""
+    from coil_fem.solvers.cudss import assemble_csr_values
+
+    fp = print_coil_fem_fingerprint()
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    J.x = dofs
+    fem = J.fem
+    support = fem.support
+    static = fem.monolithic_static
+    if static is None or static.merged_solve is None:
+        raise RuntimeError("deep residual requires monolithic cuDSS merged_solve")
+
+    out = J.run()
+    sol_flat = _sol_flat_from_run(fem, out)
+    cdofs0 = [jnp.asarray(c.get_dofs()) for c in cs.base_curves]
+    curves_live0 = fem.curves_from_dofs(cdofs0)
+    n_base = len(cdofs0)
+    pts0 = [fem.meshes[i].mesh_points_from_dofs(cdofs0[i]) for i in range(n_base)]
+    bf0 = [jnp.asarray(out["f_vol"][i]) for i in range(n_base)]
+    fe_geom0 = []
+    for i in range(n_base):
+        fe_geom0.append(fem._jit_fe_geom_fns[i](pts0[i]))
+
+    free_idx, x_full0, sdofs_from_free, x0 = _pack_free_helpers(cs, dofs)
+    h_j = jnp.asarray(h, dtype=jnp.float64)
+
+    coil_dof_offsets = static.coil_dof_offsets
+    n_dofs_per_coil = static.n_dofs_per_coil
+    support_dof_offset = static.support_dof_offset
+    n_s = static.n_s
+    has_cs = static.has_cs
+    has_sc = static.has_sc
+    I_cs = jnp.asarray(static.I_cs_pat) if has_cs else None
+    J_cs = jnp.asarray(static.J_cs_pat) if has_cs else None
+    I_sc = jnp.asarray(static.I_sc_pat) if has_sc else None
+    J_sc = jnp.asarray(static.J_sc_pat) if has_sc else None
+    pipelines = fem.pipelines
+    surf_interp = [
+        (
+            pipelines[i].problem._sel_face_sv,
+            pipelines[i].problem._surf_face_to_surf_node,
+            int(pipelines[i].problem._surf_unique_global_nodes.shape[0]),
+        )
+        for i in range(n_base)
+    ]
+
+    def _k_list(sdofs, geom):
+        ks = []
+        for i in range(n_base):
+            w_g, w_a = fem._support_weights(
+                i, pts0[i], curves_live0, sdofs, geom=geom,
+            )
+            ks.append(support.stiffness(w_g, w_a))
+        return ks
+
+    def R_coil_live_k(x_free):
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        k_list = _k_list(sdofs, geom)
+        residuals = []
+        for i, pipeline in enumerate(pipelines):
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k_list[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            u_c_i = sol_flat[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(pipeline.problem.fes[0].num_total_nodes, 3)
+            pipeline.problem.set_params(p_par)
+            res_i = pipeline.problem.compute_residual_vars(
+                [u_c_i],
+                pipeline.problem.internal_vars,
+                pipeline.problem.internal_vars_surfaces,
+            )
+            residuals.append(ravel_pytree(res_i)[0])
+        return jnp.concatenate(residuals)
+
+    def R_coil_frozen_k(x_free, k_frozen):
+        residuals = []
+        for i, pipeline in enumerate(pipelines):
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k_frozen[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            u_c_i = sol_flat[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(pipeline.problem.fes[0].num_total_nodes, 3)
+            pipeline.problem.set_params(p_par)
+            res_i = pipeline.problem.compute_residual_vars(
+                [u_c_i],
+                pipeline.problem.internal_vars,
+                pipeline.problem.internal_vars_surfaces,
+            )
+            residuals.append(ravel_pytree(res_i)[0])
+        return jnp.concatenate(residuals)
+
+    def R_coupling(x_free):
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        geom_kw = {"geom": geom}
+        s_quad = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+        jxw = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+        Iss, Jss = support.support_pattern()
+        Vss = support.support_values(
+            curves_live0, sdofs, s_quad, **geom_kw, jxw_by_coil=jxw,
+        )
+        u_s = sol_flat[support_dof_offset:]
+        r_s = jnp.zeros(n_s, dtype=Vss.dtype).at[Iss].add(Vss * u_s[Jss])
+        n_c = int(support_dof_offset)
+        r_full = jnp.concatenate([jnp.zeros(n_c, dtype=r_s.dtype), r_s])
+        V_cs, V_sc = support.coupling_values(
+            curves_live0, sdofs, s_quad,
+            surf_interp_by_coil=surf_interp,
+            jxw_by_coil=jxw,
+            **geom_kw,
+        )
+        if has_cs:
+            r_full = r_full.at[I_cs].add(V_cs * sol_flat[J_cs])
+        if has_sc:
+            r_full = r_full.at[I_sc].add(V_sc * sol_flat[J_sc])
+        return r_full
+
+    def R_full(x_free):
+        r_c = R_coil_live_k(x_free)
+        r_k = R_coupling(x_free)
+        # R_coupling already padded to full length; coil block of r_k is zero.
+        return r_k.at[: r_c.shape[0]].add(r_c)
+
+    sdofs0 = sdofs_from_free(x0)
+    geom0 = support.beam_geometry(curves_live0, sdofs0)
+    k0 = _k_list(sdofs0, geom0)
+
+    key = jax.random.PRNGKey(7 + int(args.seed))
+    v_coil = jax.random.normal(key, R_coil_live_k(x0).shape)
+    v_coup = jax.random.normal(jax.random.fold_in(key, 1), R_coupling(x0).shape)
+    v_full = jax.random.normal(jax.random.fold_in(key, 2), R_full(x0).shape)
+
+    # Also build adjoint λ from ∂J/∂u at frozen φ (support-only: ∂J/∂φ|_u ≈ 0).
+    metric = J._metrics[0]
+    if metric != "l2_von_mises":
+        raise NotImplementedError(
+            f"deep residual λ cotangent only for l2_von_mises, got {metric}"
+        )
+    weight = float(J._metric_weights[0])
+    from coil_fem.metrics import l2_von_mises
+
+    def J_of_sol(sol):
+        totals = 0.0
+        for i, pipeline in enumerate(pipelines):
+            n_nodes = pipeline.problem.fes[0].num_total_nodes
+            u = sol[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(n_nodes, 3)
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k0[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            pipeline.problem.set_params(p_par)
+            sg, jxw, _, _ = fe_geom0[i]
+            totals = totals + l2_von_mises(
+                pipeline.problem, [u], fem._lam, fem._mu,
+                shape_grads=sg, JxW=jxw,
+            )
+        return weight * totals
+
+    g_u = jax.grad(J_of_sol)(sol_flat)
+
+    # Build V_merged by calling the same blocks as forward assemble.
+    s_quad0 = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+    jxw0 = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+    V_blocks = []
+    for i, pipeline in enumerate(pipelines):
+        p_par = {
+            "points": pts0[i],
+            "body_force": bf0[i],
+            "support_k": k0[i],
+            "_fe_geom": fe_geom0[i],
+        }
+        _, _, Vi, _, _ = pipeline.assemble_coo(p_par)
+        V_blocks.append(Vi)
+    Iss, Jss = support.support_pattern()
+    Vss = support.support_values(
+        curves_live0, sdofs0, s_quad0, geom=geom0, jxw_by_coil=jxw0,
+    )
+    V_blocks.append(Vss)
+    V_cs, V_sc = support.coupling_values(
+        curves_live0, sdofs0, s_quad0,
+        surf_interp_by_coil=surf_interp,
+        jxw_by_coil=jxw0,
+        geom=geom0,
+    )
+    if has_cs:
+        V_blocks.append(V_cs)
+    if has_sc:
+        V_blocks.append(V_sc)
+    V_merged = jnp.concatenate([jnp.asarray(v) for v in V_blocks])
+    if static.adjoint_reuses_K:
+        csr_values = assemble_csr_values(V_merged, static.coo_to_csr, static.nnz_csr)
+        lambda_flat, _ = static.solver_K(g_u, csr_values)
+    else:
+        csr_values_T = assemble_csr_values(
+            V_merged, static.coo_to_csr_T, static.nnz_csr_T,
+        )
+        lambda_flat, _ = static.solver_KT(g_u, csr_values_T)
+
+    print(f"\n{'#' * 80}\n### DEEP residual FD vs VJP at frozen u*\n{'#' * 80}\n", flush=True)
+    print(f"  ||sol||={float(jnp.linalg.norm(sol_flat)):.6e}", flush=True)
+    print(f"  ||g_u||={float(jnp.linalg.norm(g_u)):.6e}", flush=True)
+    print(f"  ||λ||={float(jnp.linalg.norm(lambda_flat)):.6e}", flush=True)
+    r0 = R_full(x0)
+    print(f"  ||R(u*;φ0)||={float(jnp.linalg.norm(r0)):.6e}", flush=True)
+
+    eps_list = list(args.eps)
+    # Prefer smaller steps for residual directional probes.
+    eps_use = [e for e in eps_list if e <= 1e-4] or eps_list
+    eps_fd = float(min(eps_use))
+
+    def _dir_ratio(name, sfn):
+        # Directional derivative along h: d/dα s(x0 + α h)|_0
+        def s_alpha(alpha):
+            return sfn(x0 + alpha * h_j)
+
+        d_an = float(jax.grad(s_alpha)(0.0))
+        d_fd = float(
+            (s_alpha(eps_fd) - s_alpha(-eps_fd)) / (2.0 * eps_fd)
+        )
+        ratio = d_an / d_fd if d_fd != 0 else float("nan")
+        print(
+            f"  {name:28s}  d_an={d_an:.10e}  FD({eps_fd:.0e})={d_fd:.10e}  "
+            f"an/FD={ratio:.8f}",
+            flush=True,
+        )
+        return {"d_an": d_an, "d_fd": d_fd, "ratio": ratio}
+
+    rows = {}
+    rows["R_coil_live_k_rand"] = _dir_ratio(
+        "R_coil live k (rand v)",
+        lambda x: jnp.dot(v_coil, R_coil_live_k(x)),
+    )
+    rows["R_coil_frozen_k_rand"] = _dir_ratio(
+        "R_coil frozen k (rand v)",
+        lambda x: jnp.dot(v_coil, R_coil_frozen_k(x, k0)),
+    )
+    rows["R_coupling_rand"] = _dir_ratio(
+        "R_coupling (rand v)",
+        lambda x: jnp.dot(v_coup, R_coupling(x)),
+    )
+    rows["R_full_rand"] = _dir_ratio(
+        "R_full (rand v)",
+        lambda x: jnp.dot(v_full, R_full(x)),
+    )
+    # Actual adjoint cotangent on full residual.
+    rows["R_full_lambda"] = _dir_ratio(
+        "R_full (λ cotangent)",
+        lambda x: jnp.dot(lambda_flat, R_full(x)),
+    )
+    # Coil block of λ only.
+    n_c = int(support_dof_offset)
+    lam_c = lambda_flat[:n_c]
+    rows["R_coil_live_lambda"] = _dir_ratio(
+        "R_coil live k (λ_c)",
+        lambda x: jnp.dot(lam_c, R_coil_live_k(x)),
+    )
+    rows["R_coupling_lambda"] = _dir_ratio(
+        "R_coupling (λ)",
+        lambda x: jnp.dot(lambda_flat, R_coupling(x)),
+    )
+
+    print("\n=== DEEP DIAG PHASE residual SUMMARY ===", flush=True)
+    print(f"fingerprint: drivers={fp['drivers']}", flush=True)
+    print(f"k_live_in_drivers: {fp['k_live_in_drivers']}", flush=True)
+    print(f"n_coils: {args.n_coils}", flush=True)
+    print(f"eps_fd: {eps_fd:.1e}", flush=True)
+    for k, v in rows.items():
+        print(f"  {k}: an/FD={v['ratio']:.8f}", flush=True)
+    # Decision hints
+    r_live = rows["R_coil_live_k_rand"]["ratio"]
+    r_coup = rows["R_coupling_rand"]["ratio"]
+    if abs(r_live - 1.0) > 5e-3 and np.isfinite(r_live):
+        print(
+            "  hint: R_coil live k disagrees → Winkler residual wiring at W7-X scale",
+            flush=True,
+        )
+    elif abs(r_coup - 1.0) > 5e-3 and np.isfinite(r_coup):
+        print(
+            "  hint: R_coupling disagrees → coupling residual VJP at W7-X scale",
+            flush=True,
+        )
+    else:
+        print(
+            "  hint: residual blocks healthy → look at IFT composition (phases ablation/ift)",
+            flush=True,
+        )
+
+
+def run_deep_ablation(args):
+    """Phase 2: single ablation Taylor + JSON artifact for additive sum."""
+    fp = print_coil_fem_fingerprint()
+    ablation = args.vjp_ablation
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    fun = make_simsopt_fun(J)
+    dJh, fd, _, dJ, meta = run_taylor(
+        f"DEEP ablation={ablation}", fun, dofs, h, args.eps,
+    )
+    ratio = dJh / fd if fd else float("nan")
+    Path(args.ablation_dir).mkdir(parents=True, exist_ok=True)
+    out_path = _ablation_json_path(
+        args.ablation_dir, ablation, args.n_coils, args.seed,
+    )
+    payload = {
+        "ablation": ablation,
+        "n_coils": args.n_coils,
+        "seed": args.seed,
+        "normalize_h": bool(args.normalize_h),
+        "dJh": float(dJh),
+        "fd_plateau": float(fd) if fd is not None else None,
+        "dJh_over_FD": float(ratio) if np.isfinite(ratio) else None,
+        "J0": float(meta["J0"]),
+        "eps_plateau": float(meta["eps_plateau"]) if meta["eps_plateau"] else None,
+        "k_live_in_drivers": bool(fp["k_live_in_drivers"]),
+        "drivers": fp["drivers"],
+    }
+    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(f"\nWrote ablation artifact: {out_path}", flush=True)
+    print("\n=== DEEP DIAG PHASE ablation SUMMARY ===", flush=True)
+    print(f"ablation: {ablation}", flush=True)
+    print(f"dJh: {dJh:.16e}", flush=True)
+    print(f"FD_plateau: {fd:.16e}" if fd else "FD_plateau: None", flush=True)
+    print(f"dJh_over_FD: {ratio:.8f}", flush=True)
+    print(
+        "Next: run freeze_k and freeze_sdofs_geom (same seed/n-coils), then "
+        "--diagnostics-deep ablation-sum",
+        flush=True,
+    )
+
+
+def run_deep_ablation_sum(args):
+    """Phase 2b: combine none / freeze_k / freeze_sdofs_geom JSON artifacts."""
+    print_coil_fem_fingerprint()
+    names = ("none", "freeze_k", "freeze_sdofs_geom")
+    data = {}
+    for name in names:
+        path = _ablation_json_path(
+            args.ablation_dir, name, args.n_coils, args.seed,
+        )
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"missing ablation artifact {path}; "
+                f"run --diagnostics-deep ablation --vjp-ablation {name} first"
+            )
+        data[name] = json.loads(path.read_text(encoding="utf-8"))
+        print(f"  loaded {path}", flush=True)
+
+    dA = data["none"]["dJh"]
+    dB = data["freeze_k"]["dJh"]
+    dC = data["freeze_sdofs_geom"]["dJh"]
+    fdA = data["none"]["fd_plateau"]
+    sum_bc = dB + dC
+    print(f"\n{'#' * 80}\n### DEEP ablation additive reconstruction\n{'#' * 80}\n", flush=True)
+    print(f"  dJh_A (none)              = {dA:.16e}", flush=True)
+    print(f"  dJh_B (freeze_k)          = {dB:.16e}", flush=True)
+    print(f"  dJh_C (freeze_sdofs_geom) = {dC:.16e}", flush=True)
+    print(f"  FD_A                      = {fdA:.16e}", flush=True)
+    print(f"  dJh_B + dJh_C             = {sum_bc:.16e}", flush=True)
+    print(
+        f"  (B+C)/A                   = {sum_bc / dA:.8f}" if dA else "  (B+C)/A = nan",
+        flush=True,
+    )
+    print(
+        f"  (B+C)/FD_A                = {sum_bc / fdA:.8f}" if fdA else "  (B+C)/FD_A = nan",
+        flush=True,
+    )
+    print(
+        f"  A/FD_A                    = {dA / fdA:.8f}" if fdA else "  A/FD_A = nan",
+        flush=True,
+    )
+    den = abs(dB) + abs(dC)
+    share_b = abs(dB) / den if den > 0 else float("nan")
+    share_c = abs(dC) / den if den > 0 else float("nan")
+    print(f"  |B|/(|B|+|C|)             = {share_b:.6f}", flush=True)
+    print(f"  |C|/(|B|+|C|)             = {share_c:.6f}", flush=True)
+    print("\n=== DEEP DIAG PHASE ablation-sum SUMMARY ===", flush=True)
+    if abs(sum_bc - dA) / max(abs(dA), 1.0) < 1e-3:
+        print("  partition: B+C ≈ A (ablations partition cleanly)", flush=True)
+    else:
+        print("  partition: B+C ≠ A (shared paths / interpret carefully)", flush=True)
+    if fdA and abs(dA / fdA - 1.0) > 5e-3:
+        print("  gap vs FD remains on full reverse (A); under-diff vs forward FD", flush=True)
+
+
+def run_deep_surgical(args):
+    """Phase 3: surgical w_a ablation Taylor (freeze_wa_in_k / freeze_wa_in_coupling)."""
+    if args.vjp_ablation not in ("freeze_wa_in_k", "freeze_wa_in_coupling"):
+        raise ValueError(
+            "surgical phase expects --vjp-ablation freeze_wa_in_k "
+            "or freeze_wa_in_coupling"
+        )
+    fp = print_coil_fem_fingerprint()
+    ablation = args.vjp_ablation
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    fun = make_simsopt_fun(J)
+    dJh, fd, _, _, meta = run_taylor(
+        f"DEEP surgical ablation={ablation}", fun, dofs, h, args.eps,
+    )
+    ratio = dJh / fd if fd else float("nan")
+    Path(args.ablation_dir).mkdir(parents=True, exist_ok=True)
+    out_path = _ablation_json_path(
+        args.ablation_dir, ablation, args.n_coils, args.seed,
+    )
+    payload = {
+        "ablation": ablation,
+        "n_coils": args.n_coils,
+        "seed": args.seed,
+        "dJh": float(dJh),
+        "fd_plateau": float(fd) if fd is not None else None,
+        "dJh_over_FD": float(ratio) if np.isfinite(ratio) else None,
+        "J0": float(meta["J0"]),
+        "drivers": fp["drivers"],
+        "k_live_in_drivers": bool(fp["k_live_in_drivers"]),
+    }
+    out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(f"\nWrote surgical artifact: {out_path}", flush=True)
+    print("\n=== DEEP DIAG PHASE surgical SUMMARY ===", flush=True)
+    print(f"ablation: {ablation}", flush=True)
+    print(f"dJh_over_FD: {ratio:.8f}", flush=True)
+    print(f"J0: {meta['J0']:.16e}", flush=True)
+
+
+def run_deep_ift(args):
+    """Phase 4: residual norms, adjoint quality, manual IFT vs custom_vjp / FD."""
+    from coil_fem.metrics import l2_von_mises
+    from coil_fem.solvers.cudss import assemble_csr_values
+
+    fp = print_coil_fem_fingerprint()
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    fun = make_simsopt_fun(J)
+    dJh_vjp, fd, _, dJ, meta = run_taylor(
+        "DEEP ift: custom_vjp simsopt J/dJ", fun, dofs, h, args.eps,
+    )
+
+    J.x = dofs
+    fem = J.fem
+    support = fem.support
+    static = fem.monolithic_static
+    out = J.run()
+    sol_flat = _sol_flat_from_run(fem, out)
+    cdofs0 = [jnp.asarray(c.get_dofs()) for c in cs.base_curves]
+    curves_live0 = fem.curves_from_dofs(cdofs0)
+    n_base = len(cdofs0)
+    pts0 = [fem.meshes[i].mesh_points_from_dofs(cdofs0[i]) for i in range(n_base)]
+    bf0 = [jnp.asarray(out["f_vol"][i]) for i in range(n_base)]
+    fe_geom0 = [fem._jit_fe_geom_fns[i](pts0[i]) for i in range(n_base)]
+    free_idx, x_full0, sdofs_from_free, x0 = _pack_free_helpers(cs, dofs)
+    h_j = jnp.asarray(h, dtype=jnp.float64)
+
+    coil_dof_offsets = static.coil_dof_offsets
+    n_dofs_per_coil = static.n_dofs_per_coil
+    support_dof_offset = static.support_dof_offset
+    n_s = static.n_s
+    has_cs, has_sc = static.has_cs, static.has_sc
+    I_cs = jnp.asarray(static.I_cs_pat) if has_cs else None
+    J_cs = jnp.asarray(static.J_cs_pat) if has_cs else None
+    I_sc = jnp.asarray(static.I_sc_pat) if has_sc else None
+    J_sc = jnp.asarray(static.J_sc_pat) if has_sc else None
+    pipelines = fem.pipelines
+    surf_interp = [
+        (
+            pipelines[i].problem._sel_face_sv,
+            pipelines[i].problem._surf_face_to_surf_node,
+            int(pipelines[i].problem._surf_unique_global_nodes.shape[0]),
+        )
+        for i in range(n_base)
+    ]
+
+    def _k_list(sdofs, geom):
+        return [
+            support.stiffness(*fem._support_weights(
+                i, pts0[i], curves_live0, sdofs, geom=geom,
+            ))
+            for i in range(n_base)
+        ]
+
+    def R_full(x_free):
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        k_list = _k_list(sdofs, geom)
+        residuals = []
+        for i, pipeline in enumerate(pipelines):
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k_list[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            u_c_i = sol_flat[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(pipeline.problem.fes[0].num_total_nodes, 3)
+            pipeline.problem.set_params(p_par)
+            res_i = pipeline.problem.compute_residual_vars(
+                [u_c_i],
+                pipeline.problem.internal_vars,
+                pipeline.problem.internal_vars_surfaces,
+            )
+            residuals.append(ravel_pytree(res_i)[0])
+        s_quad = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+        jxw = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+        Iss, Jss = support.support_pattern()
+        Vss = support.support_values(
+            curves_live0, sdofs, s_quad, geom=geom, jxw_by_coil=jxw,
+        )
+        u_s = sol_flat[support_dof_offset:]
+        r_s = jnp.zeros(n_s, dtype=Vss.dtype).at[Iss].add(Vss * u_s[Jss])
+        r_full = jnp.concatenate(residuals + [r_s])
+        V_cs, V_sc = support.coupling_values(
+            curves_live0, sdofs, s_quad,
+            surf_interp_by_coil=surf_interp,
+            jxw_by_coil=jxw,
+            geom=geom,
+        )
+        if has_cs:
+            r_full = r_full.at[I_cs].add(V_cs * sol_flat[J_cs])
+        if has_sc:
+            r_full = r_full.at[I_sc].add(V_sc * sol_flat[J_sc])
+        return r_full
+
+    sdofs0 = sdofs_from_free(x0)
+    geom0 = support.beam_geometry(curves_live0, sdofs0)
+    k0 = _k_list(sdofs0, geom0)
+    weight = float(J._metric_weights[0])
+    if J._metrics[0] != "l2_von_mises":
+        raise NotImplementedError(
+            f"deep ift only for l2_von_mises, got {J._metrics[0]}"
+        )
+
+    def J_of_sol(sol):
+        totals = 0.0
+        for i, pipeline in enumerate(pipelines):
+            n_nodes = pipeline.problem.fes[0].num_total_nodes
+            u = sol[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(n_nodes, 3)
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k0[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            pipeline.problem.set_params(p_par)
+            sg, jxw, _, _ = fe_geom0[i]
+            totals = totals + l2_von_mises(
+                pipeline.problem, [u], fem._lam, fem._mu,
+                shape_grads=sg, JxW=jxw,
+            )
+        return weight * totals
+
+    g_u = jax.grad(J_of_sol)(sol_flat)
+    s_quad0 = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+    jxw0 = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+    V_blocks = []
+    f_blocks = []
+    for i, pipeline in enumerate(pipelines):
+        p_par = {
+            "points": pts0[i],
+            "body_force": bf0[i],
+            "support_k": k0[i],
+            "_fe_geom": fe_geom0[i],
+        }
+        _, _, Vi, _, fi = pipeline.assemble_coo(p_par)
+        V_blocks.append(Vi)
+        f_blocks.append(fi)
+    Iss, Jss = support.support_pattern()
+    Vss = support.support_values(
+        curves_live0, sdofs0, s_quad0, geom=geom0, jxw_by_coil=jxw0,
+    )
+    V_blocks.append(Vss)
+    f_blocks.append(jnp.zeros(n_s, dtype=Vss.dtype))
+    V_cs, V_sc = support.coupling_values(
+        curves_live0, sdofs0, s_quad0,
+        surf_interp_by_coil=surf_interp,
+        jxw_by_coil=jxw0,
+        geom=geom0,
+    )
+    if has_cs:
+        V_blocks.append(V_cs)
+    if has_sc:
+        V_blocks.append(V_sc)
+    V_merged = jnp.concatenate([jnp.asarray(v) for v in V_blocks])
+    f_merged = jnp.concatenate(f_blocks)
+    csr_values = assemble_csr_values(V_merged, static.coo_to_csr, static.nnz_csr)
+    # Forward residual check: K u - f
+    # Reconstruct Ku via COO scatter (pattern from static).
+    # Use residual R(u*) instead (includes same physics).
+    r0 = R_full(x0)
+    nrm_r = float(jnp.linalg.norm(r0))
+    nrm_f = float(jnp.linalg.norm(f_merged))
+
+    if static.adjoint_reuses_K:
+        lambda_flat, _ = static.solver_K(g_u, csr_values)
+    else:
+        csr_values_T = assemble_csr_values(
+            V_merged, static.coo_to_csr_T, static.nnz_csr_T,
+        )
+        lambda_flat, _ = static.solver_KT(g_u, csr_values_T)
+
+    # Manual IFT: for support-only free DOFs, ∂J/∂φ|_u ≈ 0, so
+    # dJ/dh ≈ λ · dR/dh at frozen u*.
+    def s_lam(alpha):
+        return jnp.dot(lambda_flat, R_full(x0 + alpha * h_j))
+
+    dJh_manual = float(jax.grad(s_lam)(0.0))
+    eps_fd = float(min(args.eps))
+    fd_manual = float((s_lam(eps_fd) - s_lam(-eps_fd)) / (2.0 * eps_fd))
+
+    print(f"\n{'#' * 80}\n### DEEP IFT identity checks\n{'#' * 80}\n", flush=True)
+    print(f"  ||R(u*;φ0)||           = {nrm_r:.6e}", flush=True)
+    print(f"  ||f||                  = {nrm_f:.6e}", flush=True)
+    print(f"  ||R||/||f||            = {nrm_r / max(nrm_f, 1.0):.6e}", flush=True)
+    print(f"  ||g_u||                = {float(jnp.linalg.norm(g_u)):.6e}", flush=True)
+    print(f"  ||λ||                  = {float(jnp.linalg.norm(lambda_flat)):.6e}", flush=True)
+    print(f"  adjoint_reuses_K       = {static.adjoint_reuses_K}", flush=True)
+    print(f"  dJh_custom_vjp         = {dJh_vjp:.16e}", flush=True)
+    print(f"  FD_J (plateau)         = {fd:.16e}", flush=True)
+    print(f"  dJh_manual_IFT (λ·∂R)  = {dJh_manual:.16e}", flush=True)
+    print(f"  FD(λ·R)                = {fd_manual:.16e}", flush=True)
+    print(
+        f"  manual/custom_vjp      = {dJh_manual / dJh_vjp:.8f}"
+        if dJh_vjp else "  manual/custom_vjp = nan",
+        flush=True,
+    )
+    print(
+        f"  manual/FD_J            = {dJh_manual / fd:.8f}" if fd else "  manual/FD_J = nan",
+        flush=True,
+    )
+    print(
+        f"  custom_vjp/FD_J        = {dJh_vjp / fd:.8f}" if fd else "  custom_vjp/FD_J = nan",
+        flush=True,
+    )
+    print(
+        f"  (λ·∂R VJP)/(λ·R FD)    = {dJh_manual / fd_manual:.8f}"
+        if fd_manual else "  (λ·∂R VJP)/(λ·R FD) = nan",
+        flush=True,
+    )
+
+    print("\n=== DEEP DIAG PHASE ift SUMMARY ===", flush=True)
+    print(f"fingerprint: drivers={fp['drivers']}", flush=True)
+    print(f"k_live_in_drivers: {fp['k_live_in_drivers']}", flush=True)
+    print(f"n_coils: {args.n_coils}", flush=True)
+    print(f"||R||/||f||: {nrm_r / max(nrm_f, 1.0):.6e}", flush=True)
+    if fd:
+        print(f"custom_vjp_over_FD: {dJh_vjp / fd:.8f}", flush=True)
+        print(f"manual_IFT_over_FD: {dJh_manual / fd:.8f}", flush=True)
+    if dJh_vjp:
+        print(f"manual_over_custom_vjp: {dJh_manual / dJh_vjp:.8f}", flush=True)
+    if fd and abs(dJh_manual / fd - 1.0) < 5e-3 and abs(dJh_vjp / fd - 1.0) > 5e-3:
+        print(
+            "  hint: manual IFT matches FD but custom_vjp does not → "
+            "g_k/g_sdofs stitching in _bwd/_solve_all",
+            flush=True,
+        )
+    elif fd and abs(dJh_manual / fd - 1.0) > 5e-3:
+        print(
+            "  hint: manual IFT also short vs FD_J → direct φ dependence or "
+            "residual definition mismatch under load",
+            flush=True,
+        )
+
+
+def run_deep_scale(args):
+    """Phase 5: full Taylor at the requested --n-coils (compare 1 vs 5 across jobs)."""
+    fp = print_coil_fem_fingerprint()
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    fun = make_simsopt_fun(J)
+    dJh, fd, _, _, meta = run_taylor(
+        f"DEEP scale n_coils={args.n_coils}", fun, dofs, h, args.eps,
+    )
+    ratio = dJh / fd if fd else float("nan")
+    print("\n=== DEEP DIAG PHASE scale SUMMARY ===", flush=True)
+    print(f"fingerprint: drivers={fp['drivers']}", flush=True)
+    print(f"k_live_in_drivers: {fp['k_live_in_drivers']}", flush=True)
+    print(f"n_coils: {args.n_coils}", flush=True)
+    print(f"J0: {meta['J0']:.16e}", flush=True)
+    print(f"dJh_over_FD: {ratio:.8f}", flush=True)
+    print(
+        "Compare this ratio across --n-coils 1 and --n-coils 5 (same seed).",
+        flush=True,
+    )
+
+
+def run_diagnostics_deep(args):
+    """Dispatch --diagnostics-deep PHASE."""
+    phase = args.diagnostics_deep
+    print(f"\n===== diagnostics-deep phase={phase} =====\n", flush=True)
+    if phase == "groups":
+        run_deep_groups(args)
+    elif phase == "residual":
+        run_deep_residual(args)
+    elif phase == "ablation":
+        run_deep_ablation(args)
+    elif phase == "ablation-sum":
+        run_deep_ablation_sum(args)
+    elif phase == "surgical":
+        run_deep_surgical(args)
+    elif phase == "ift":
+        run_deep_ift(args)
+    elif phase == "scale":
+        run_deep_scale(args)
+    else:
+        raise ValueError(f"unknown diagnostics-deep phase: {phase}")
 
 
 def run_diagnostics(args):
@@ -686,12 +1509,16 @@ def main():
     print(f"  compare_wa_slice = {args.compare_wa_slice}", flush=True)
     print(f"  vjp_ablation     = {args.vjp_ablation}", flush=True)
     print(f"  diagnostics      = {args.diagnostics}", flush=True)
+    print(f"  diagnostics_deep = {args.diagnostics_deep}", flush=True)
     print(f"  n_coils          = {args.n_coils}", flush=True)
     print(f"  normalize_h      = {args.normalize_h}", flush=True)
     print(f"  eps              = {args.eps}", flush=True)
     print(f"  seed             = {args.seed}", flush=True)
 
-    if args.vjp_ablation != "none":
+    # ablation-sum only reads JSON; do not force an ablation env.
+    if args.diagnostics_deep == "ablation-sum":
+        os.environ.pop(_VJP_ABLATION_ENV, None)
+    elif args.vjp_ablation != "none":
         os.environ[_VJP_ABLATION_ENV] = args.vjp_ablation
         print(
             f"Set {_VJP_ABLATION_ENV}={args.vjp_ablation} "
@@ -700,6 +1527,16 @@ def main():
         )
     else:
         os.environ.pop(_VJP_ABLATION_ENV, None)
+
+    if args.diagnostics_deep is not None:
+        if args.diagnostics:
+            print(
+                "NOTE: --diagnostics-deep takes precedence over --diagnostics.",
+                flush=True,
+            )
+        run_diagnostics_deep(args)
+        print("\nDone.", flush=True)
+        return
 
     if args.diagnostics:
         run_diagnostics(args)

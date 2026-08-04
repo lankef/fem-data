@@ -17,8 +17,22 @@
 #   sbatch jobscript_taylor.sh --vjp-ablation freeze_k
 #   sbatch jobscript_taylor.sh --vjp-ablation freeze_sdofs_geom
 #
+# Deep diagnostics (one phase per job; sync coil-fem + taylor.py first):
+#   sbatch jobscript_taylor.sh --diagnostics-deep groups
+#   sbatch jobscript_taylor.sh --diagnostics-deep residual
+#   sbatch jobscript_taylor.sh --diagnostics-deep ablation --vjp-ablation none
+#   sbatch jobscript_taylor.sh --diagnostics-deep ablation --vjp-ablation freeze_k
+#   sbatch jobscript_taylor.sh --diagnostics-deep ablation --vjp-ablation freeze_sdofs_geom
+#   sbatch jobscript_taylor.sh --diagnostics-deep ablation-sum
+#   sbatch jobscript_taylor.sh --diagnostics-deep surgical --vjp-ablation freeze_wa_in_k
+#   sbatch jobscript_taylor.sh --diagnostics-deep surgical --vjp-ablation freeze_wa_in_coupling
+#   sbatch jobscript_taylor.sh --diagnostics-deep ift
+#   sbatch jobscript_taylor.sh --diagnostics-deep scale --n-coils 1
+#   sbatch jobscript_taylor.sh --diagnostics-deep scale --n-coils 5
+#
 # Fallback if the cluster strips sbatch args:
 #   sbatch --export=ALL,TAYLOR_FLAGS=--diagnostics jobscript_taylor.sh
+#   sbatch --export=ALL,TAYLOR_FLAGS=--diagnostics-deep residual jobscript_taylor.sh
 #   sbatch --export=ALL,TAYLOR_FLAGS=--force-kt-adjoint jobscript_taylor.sh
 #   (no quotes around the flag value)
 
