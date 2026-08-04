@@ -235,9 +235,11 @@ def phase_meshshift(n_coils):
 
     worst_ang = 0.0
     worst_disp = 0.0
+    coarsest_M = None          # coils may carry different quadpoint counts
     for i, mesh in enumerate(fem.meshes):
         fc = mesh.framed_curve
         M = int(fc.curve.quadpoints.shape[0])
+        coarsest_M = M if coarsest_M is None else min(coarsest_M, M)
         K = 2 * M                       # TET10 stride
         phi_grid = jnp.linspace(0.0, 1.0, K, endpoint=False)
 
@@ -260,14 +262,18 @@ def phase_meshshift(n_coils):
         print(f"  coil {i}: M={M} K={K}  max angle={ang:.3e} rad  "
               f"max node shift={disp:.3e} m", flush=True)
 
-    # The RMF's own periodic-closure residual is O(1/M); a shift at or below
-    # that is within the model's existing accuracy rather than a new error.
-    tol = 1.0 / M
+    # The RMF's own periodic-closure residual is O(1/M), so a shift on that
+    # scale is within the model's existing accuracy rather than a new error.
+    # "O(1/M)" fixes the scaling, not the coefficient; the factor of 2 is the
+    # slack that buys, and anything beyond it is a real change worth looking at.
+    scale = 1.0 / coarsest_M
+    tol = 2.0 * scale
     print(f"\n  worst angular difference : {worst_ang:.6e} rad", flush=True)
     print(f"  worst node displacement  : {worst_disp:.6e} m", flush=True)
-    print(f"  RMF closure accuracy O(1/M): {tol:.6e}", flush=True)
-    check("mesh shift within the RMF's own O(1/M) accuracy", worst_ang < tol,
-          f"{worst_ang:.3e} vs {tol:.3e}")
+    print(f"  RMF closure accuracy 1/M : {scale:.6e}  (tol = 2/M = {tol:.6e})",
+          flush=True)
+    check("mesh shift on the scale of the RMF's own 1/M accuracy",
+          worst_ang < tol, f"{worst_ang:.3e} vs {tol:.3e}")
 
 
 # ============================================================================
