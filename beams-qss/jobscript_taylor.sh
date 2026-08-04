@@ -9,6 +9,7 @@
 
 # Preferred (flags after script name):
 #   sbatch jobscript_taylor.sh
+#   sbatch jobscript_taylor.sh --diagnostics
 #   sbatch jobscript_taylor.sh --force-kt-adjoint
 #   sbatch jobscript_taylor.sh --drop-winkler-wa
 #   sbatch jobscript_taylor.sh --simsopt-free
@@ -17,6 +18,7 @@
 #   sbatch jobscript_taylor.sh --vjp-ablation freeze_sdofs_geom
 #
 # Fallback if the cluster strips sbatch args:
+#   sbatch --export=ALL,TAYLOR_FLAGS=--diagnostics jobscript_taylor.sh
 #   sbatch --export=ALL,TAYLOR_FLAGS=--force-kt-adjoint jobscript_taylor.sh
 #   (no quotes around the flag value)
 
