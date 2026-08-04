@@ -7,6 +7,12 @@
 #SBATCH --error=logs/slurm_%A_%a.err
 #SBATCH --gres=gpu:l40s:1
 
+# Pass probe flags after the script name (more reliable than --export):
+#   sbatch jobscript_taylor.sh
+#   sbatch jobscript_taylor.sh --force-kt-adjoint
+#   sbatch jobscript_taylor.sh --drop-winkler-wa
+#   sbatch jobscript_taylor.sh --simsopt-free
+#   sbatch jobscript_taylor.sh --force-kt-adjoint --simsopt-free
 
 mkdir -p logs
 
@@ -19,13 +25,13 @@ echo "Job ID:         $SLURM_JOB_ID"
 echo "Nodes:          $SLURM_JOB_NUM_NODES"
 echo "CPUs per task:  $SLURM_CPUS_PER_TASK"
 echo "Start time:     $(date)"
+echo "PWD:            $PWD"
+echo "taylor.py:      $(ls -l ./taylor.py)"
+echo "Args:           $*"
+# Sanity check: updated script prints "taylor.py probes:"
+head -n 3 ./taylor.py
 conda activate desc
 
-# Baseline Taylor (simsopt J/dJ). Optional probes for the ~2% grad gap:
-#   --force-kt-adjoint   # (1) adjoint uses Kᵀ instead of reused K
-#   --drop-winkler-wa    # (2) drop grounded k_attachment*w_a Winkler term
-#   --simsopt-free       # (3) also Taylor jax.grad(fem.objective)
-# Pass extra flags via: sbatch --export=ALL,TAYLOR_FLAGS="--force-kt-adjoint" ...
-python -u ./taylor.py ${TAYLOR_FLAGS:-}
+python -u ./taylor.py "$@"
 
 echo "End time:       $(date)"
