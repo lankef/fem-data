@@ -1,13 +1,13 @@
-Job ID:         15267561
+Job ID:         15268730
 Nodes:          1
 CPUs per task:  4
-Start time:     Tue Aug  4 13:05:23 EDT 2026
+Start time:     Tue Aug  4 13:44:15 EDT 2026
 PWD:            /scratch/lf2869/project/fem-data/beams-qss
 taylor.py:      -rw-r--r--. 1 lf2869 lf2869 19270 Aug  4 12:05 ./taylor.py
-sbatch $@:     --drop-winkler-wa
+sbatch $@:     
 TAYLOR_FLAGS:   
 CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
-Running: python -u ./taylor.py --drop-winkler-wa
+Running: python -u ./taylor.py 
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -18,7 +18,7 @@ Running: python -u ./taylor.py --drop-winkler-wa
 
 taylor.py probes:
   force_kt_adjoint = False
-  drop_winkler_wa  = True
+  drop_winkler_wa  = False
   simsopt_free     = False
   compare_wa_slice = False
   vjp_ablation     = none
@@ -46,7 +46,6 @@ Total # dofs: 50
   adjoint_reuses_K      : True
   solver_KT is None     : True
   coo_to_csr_T is None  : True
-Probe 2: dropped winkler w_a term (k_clamp=1.5150e+16, k_attachment=2.7956e+14 still used in K_cs/K_ss).
 # free dofs: (50,)
 dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
 
@@ -56,26 +55,26 @@ dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1
 
 solving with float64
 solving with float64
-J0  = 8554487147672074.0
-dJh = -5.805454380726456e+16
-|dJ| = 5.955830857070301e+16
+J0  = 3.6216558144472e+16
+dJh = -2.927033275640933e+17
+|dJ| = 2.5097772762399018e+17
 
        eps      centered diff                err          err/eps^2    |err|/|dJh|
-   1.0e-02  -2.7166929519e+16   3.0887614288e+16   3.0887614288e+20   5.320447e-01
-   1.0e-03  -3.1343759997e+16   2.6710783810e+16   2.6710783810e+22   4.600981e-01
-    (err ratio vs previous eps: 0.865, expect ~1e2 if O(eps^2))
-   1.0e-04  -6.4222299316e+16  -6.1677555087e+15  -6.1677555087e+23   1.062407e-01
-    (err ratio vs previous eps: -0.231, expect ~1e2 if O(eps^2))
-   1.0e-05  -5.8117101267e+16  -6.2557459335e+13  -6.2557459335e+23   1.077564e-03
-    (err ratio vs previous eps: 0.010, expect ~1e2 if O(eps^2))
-   1.0e-06  -5.8055201325e+16  -6.5751773544e+11  -6.5751773544e+23   1.132586e-05
-    (err ratio vs previous eps: 0.011, expect ~1e2 if O(eps^2))
-   1.0e-07  -5.8054585600e+16  -4.1792735440e+10  -4.1792735440e+24   7.198874e-07
-    (err ratio vs previous eps: 0.064, expect ~1e2 if O(eps^2))
+   1.0e-02  -1.0505636207e+17   1.8764696549e+17   1.8764696549e+21   6.410824e-01
+   1.0e-03  -1.6760201606e+17   1.2510131150e+17   1.2510131150e+23   4.273997e-01
+    (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2))
+   1.0e-04  -2.9326981070e+17  -5.6648313471e+14  -5.6648313471e+22   1.935349e-03
+    (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2))
+   1.0e-05  -2.9611520456e+17  -3.4118769967e+15  -3.4118769967e+25   1.165643e-02
+    (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2))
+   1.0e-06  -2.9615593989e+17  -3.4526123239e+15  -3.4526123239e+27   1.179560e-02
+    (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2))
+   1.0e-07  -2.9615607688e+17  -3.4527493159e+15  -3.4527493159e+29   1.179607e-02
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
 
-summary: dJh/FD = 0.99999928  (1.0 = perfect; baseline residual was ~0.979)
-best-eps summary: eps=1.0e-07  FD=-5.8054585600e+16  dJh/FD=0.99999928
+summary: dJh/FD = 0.98834145  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-04  FD=-2.9326981070e+17  dJh/FD=0.99806839
 
 Done.
 Exit code:      0
-End time:       Tue Aug  4 13:15:59 EDT 2026
+End time:       Tue Aug  4 13:51:02 EDT 2026
