@@ -33,16 +33,18 @@ from __future__ import annotations
 
 import argparse
 
-import gmsh  # noqa: F401  # ensure gmsh is loaded before jax-fem side effects
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.flatten_util import ravel_pytree
+
+# Import coil_fem before gmsh.  Loading gmsh first can pull the module
+# anaconda libstdc++ ahead of the conda env's, breaking basix (CXXABI_1.3.15).
+from coil_fem.simsopt import CoilFEMObjective, CoilSupportBeams
+import gmsh  # noqa: F401
 from simsopt.configs import get_data
 from simsopt.field import Coil
 from simsopt.mhd import Vmec
-
-from coil_fem.simsopt import CoilFEMObjective, CoilSupportBeams
 
 jax.config.update("jax_enable_x64", True)
 
