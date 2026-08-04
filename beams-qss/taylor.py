@@ -22,16 +22,30 @@
 #        free support flat vector, vs FD, vs Jstress.dJ().  Isolates
 #        simsopt flatten/mask issues from the FEM custom_vjp.
 #
+#   4) --compare-wa-slice
+#        One job: full model + no-w_a model.  Prints FD/analytic directional
+#        derivatives and the grounded-w_a slices
+#          dJh_wa ≈ FD_full - FD_no_wa
+#          dJh_wa_analytic ≈ dJh_full - dJh_no_wa
+#
+#   5) --vjp-ablation {freeze_k|freeze_sdofs_geom}
+#        Sets COIL_FEM_VJP_ABLATION before CoilFEM construction (see
+#        coil-fem notes/WINKLER_WA_VJP.md).  freeze_k zeros g_k; freeze_sdofs_geom
+#        stop_gradients sdofs inside constraint geom/coupling.
+#
 # Examples:
 #   python -u ./taylor.py
 #   python -u ./taylor.py --force-kt-adjoint
 #   python -u ./taylor.py --drop-winkler-wa
 #   python -u ./taylor.py --simsopt-free
+#   python -u ./taylor.py --compare-wa-slice
+#   python -u ./taylor.py --vjp-ablation freeze_k
 #   python -u ./taylor.py --force-kt-adjoint --drop-winkler-wa --simsopt-free
 
 from __future__ import annotations
 
 import argparse
+import os
 
 import jax
 import jax.numpy as jnp
@@ -48,9 +62,13 @@ from simsopt.mhd import Vmec
 
 jax.config.update("jax_enable_x64", True)
 
+_VJP_ABLATION_ENV = "COIL_FEM_VJP_ABLATION"
+
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument(
         "--force-kt-adjoint",
         action="store_true",
@@ -67,6 +85,17 @@ def parse_args():
         help="Probe 3: also run jax.grad(fem.objective) Taylor vs simsopt dJ.",
     )
     p.add_argument(
+        "--compare-wa-slice",
+        action="store_true",
+        help="Probe 4: full vs no-w_a FD/analytic; print grounded-w_a slices.",
+    )
+    p.add_argument(
+        "--vjp-ablation",
+        choices=("none", "freeze_k", "freeze_sdofs_geom"),
+        default="none",
+        help="Probe 5: set COIL_FEM_VJP_ABLATION before building CoilFEM.",
+    )
+    p.add_argument(
         "--eps",
         type=float,
         nargs="+",
@@ -74,10 +103,16 @@ def parse_args():
         help="Centered-difference step sizes.",
     )
     p.add_argument("--seed", type=int, default=1, help="RNG seed for direction h.")
+    p.add_argument(
+        "--n-coils",
+        type=int,
+        default=5,
+        help="Number of W7-X base coils (1 fits a local GPU for smoke Taylor).",
+    )
     return p.parse_args()
 
 
-def build_problem(force_kt_adjoint: bool):
+def build_problem(force_kt_adjoint: bool, n_coils: int = 5):
     """Construct CoilSupportBeams + CoilFEMObjective (proto.py setup)."""
     eq = Vmec("../fixed-continuation/wout.nc", keep_all_files=True)
     n_phi, n_theta = 25, 50
@@ -92,11 +127,13 @@ def build_problem(force_kt_adjoint: bool):
     plasma_surface.set_dofs(eq.boundary.get_dofs())
 
     coil_per_half_fp = 5
+    if not (1 <= n_coils <= coil_per_half_fp):
+        raise ValueError(f"--n-coils must be in 1..{coil_per_half_fp}, got {n_coils}")
     curves, currents, axis, nfp, bs = get_data(
         "w7x", coil_order=8, points_per_period=8
     )
-    base_curves = curves[:coil_per_half_fp]
-    base_currents = currents[:coil_per_half_fp]
+    base_curves = curves[:n_coils]
+    base_currents = currents[:n_coils]
 
     mesh_options = {
         "shape": "rect",
@@ -121,14 +158,26 @@ def build_problem(force_kt_adjoint: bool):
         "itc": 0.0,
     }
     gravity_options = {"g_vec": (0, 0, 0)}
-    beam_options = {
-        "n_beam_cc": 4,
-        "n_beam_cf": 0,
-        "E": material_options["E"],
-        "nu": material_options["nu"],
-        "cross_section_type": "solid_circle",
-        "attachment_type": "direct",
-    }
+    # One-coil local runs: keep a wrap CC beam under stellsym when possible;
+    # otherwise use a foundation beam so grounded w_a stays active.
+    if n_coils == 1:
+        beam_options = {
+            "n_beam_cc": 1,
+            "n_beam_cf": 1,
+            "E": material_options["E"],
+            "nu": material_options["nu"],
+            "cross_section_type": "solid_circle",
+            "attachment_type": "direct",
+        }
+    else:
+        beam_options = {
+            "n_beam_cc": 4,
+            "n_beam_cf": 0,
+            "E": material_options["E"],
+            "nu": material_options["nu"],
+            "cross_section_type": "solid_circle",
+            "attachment_type": "direct",
+        }
     fixed_clamp_options = {
         "enabled": True,
         "r_clamp": 1.73 * mesh_options["w1"] / 2,
@@ -232,6 +281,7 @@ def run_taylor(name, J_and_dJ, dofs, h, eps_list):
     )
     prev_err = None
     last_fd = None
+    best = None  # (abs_rel_err, eps, fd)
     for eps in eps_list:
         J1, _ = J_and_dJ(dofs + eps * h)
         J2, _ = J_and_dJ(dofs - eps * h)
@@ -250,13 +300,25 @@ def run_taylor(name, J_and_dJ, dofs, h, eps_list):
             )
         prev_err = err
         last_fd = fd
+        cand = (rel, eps, fd)
+        if best is None or cand[0] < best[0]:
+            best = cand
     if last_fd is not None and abs(last_fd) > 0:
         print(
             f"\nsummary: dJh/FD = {dJh / last_fd:.8f}  "
             f"(1.0 = perfect; baseline residual was ~0.979)",
             flush=True,
         )
-    return dJh, last_fd, dJ0
+    # Prefer the eps with smallest relative error for slice summaries.
+    fd_best = best[2] if best is not None else last_fd
+    eps_best = best[1] if best is not None else None
+    if eps_best is not None:
+        print(
+            f"best-eps summary: eps={eps_best:.1e}  FD={fd_best:.10e}  "
+            f"dJh/FD={dJh / fd_best:.8f}",
+            flush=True,
+        )
+    return dJh, fd_best, dJ0
 
 
 def make_simsopt_fun(Jstress):
@@ -269,7 +331,10 @@ def make_simsopt_fun(Jstress):
 
 def make_simsopt_free_fun(Jstress, coil_support):
     """jax.grad through fem.objective on free support DOFs only (no Derivative)."""
-    free = np.asarray(coil_support.local_dofs_free_status, dtype=bool)
+    free_mask = np.asarray(coil_support.local_dofs_free_status, dtype=bool)
+    # Concrete integer indices — boolean masks under JIT raise
+    # NonConcreteBooleanIndexError for .at[].set().
+    free_idx = np.flatnonzero(free_mask)
     x_full0 = np.asarray(coil_support.local_full_x, dtype=float)
     # Capture fixed curve/current values once (they are fix_all()'d).
     cdofs0 = [jnp.asarray(c.get_dofs()) for c in coil_support.base_curves]
@@ -282,7 +347,7 @@ def make_simsopt_free_fun(Jstress, coil_support):
     metric = Jstress._metrics[0]
 
     def J_free(x_free):
-        x_full = jnp.asarray(x_full0).at[jnp.asarray(free)].set(x_free)
+        x_full = jnp.asarray(x_full0).at[free_idx].set(x_free)
         sdofs = unravel(x_full)
         out = fem.objective(cdofs0, idofs0, sdofs, metrics=(metric,))
         return weight * out[metric]
@@ -295,7 +360,7 @@ def make_simsopt_free_fun(Jstress, coil_support):
         x = jnp.asarray(dofs, dtype=jnp.float64)
         return float(J_jit(x)), np.asarray(grad_J(x), dtype=float)
 
-    return fun, free
+    return fun, free_mask
 
 
 def compare_grads(name_a, dJa, name_b, dJb):
@@ -313,22 +378,73 @@ def compare_grads(name_a, dJa, name_b, dJb):
     )
 
 
+def print_wa_slice(dJh_full, fd_full, dJh_no_wa, fd_no_wa):
+    """Print grounded-w_a directional-derivative slice diagnostics."""
+    dJh_wa = float(fd_full) - float(fd_no_wa)
+    dJh_wa_analytic = float(dJh_full) - float(dJh_no_wa)
+    print(f"\n{'#' * 80}", flush=True)
+    print("### Grounded-w_a slice (compare-wa-slice)", flush=True)
+    print(f"{'#' * 80}\n", flush=True)
+    print(f"  dJh_full          = {dJh_full:.16e}", flush=True)
+    print(f"  FD_full           = {fd_full:.16e}", flush=True)
+    print(f"  dJh_full/FD_full  = {dJh_full / fd_full:.8f}", flush=True)
+    print(f"  dJh_no_wa         = {dJh_no_wa:.16e}", flush=True)
+    print(f"  FD_no_wa          = {fd_no_wa:.16e}", flush=True)
+    print(f"  dJh_no_wa/FD_no_wa= {dJh_no_wa / fd_no_wa:.8f}", flush=True)
+    print(f"  dJh_wa            = FD_full - FD_no_wa     = {dJh_wa:.16e}", flush=True)
+    print(
+        f"  dJh_wa_analytic   = dJh_full - dJh_no_wa   = {dJh_wa_analytic:.16e}",
+        flush=True,
+    )
+    scale = max(abs(dJh_wa), abs(dJh_wa_analytic), 1.0)
+    print(
+        f"  analytic/FD slice = {dJh_wa_analytic / dJh_wa:.8f}  "
+        f"(|diff|/scale={abs(dJh_wa_analytic - dJh_wa) / scale:.6e})",
+        flush=True,
+    )
+    if abs(dJh_wa_analytic) < 0.5 * abs(dJh_wa):
+        verdict = "UNDER-differentiated grounded-w_a path (most likely)"
+    elif abs(dJh_wa_analytic) > 1.5 * abs(dJh_wa):
+        verdict = "OVER-differentiated / double-counted grounded-w_a path"
+    elif dJh_wa * dJh_wa_analytic < 0:
+        verdict = "WRONG-SIGN grounded-w_a path"
+    else:
+        verdict = "slice magnitudes comparable (look at ratio carefully)"
+    print(f"  interpretation    : {verdict}", flush=True)
+
+
 def main():
     args = parse_args()
     print("taylor.py probes:", flush=True)
     print(f"  force_kt_adjoint = {args.force_kt_adjoint}", flush=True)
     print(f"  drop_winkler_wa  = {args.drop_winkler_wa}", flush=True)
     print(f"  simsopt_free     = {args.simsopt_free}", flush=True)
+    print(f"  compare_wa_slice = {args.compare_wa_slice}", flush=True)
+    print(f"  vjp_ablation     = {args.vjp_ablation}", flush=True)
+    print(f"  n_coils          = {args.n_coils}", flush=True)
     print(f"  eps              = {args.eps}", flush=True)
     print(f"  seed             = {args.seed}", flush=True)
 
-    Jstress, coil_support = build_problem(args.force_kt_adjoint)
+    if args.vjp_ablation != "none":
+        os.environ[_VJP_ABLATION_ENV] = args.vjp_ablation
+        print(
+            f"Set {_VJP_ABLATION_ENV}={args.vjp_ablation} "
+            "(read at make_merged_solve / CoilFEM construction).",
+            flush=True,
+        )
+    else:
+        # Avoid a stale env from a previous interactive session.
+        os.environ.pop(_VJP_ABLATION_ENV, None)
+
+    Jstress, coil_support = build_problem(
+        args.force_kt_adjoint, n_coils=args.n_coils,
+    )
     print("# mesh node for all coils:", Jstress.n_nodes, flush=True)
     print("# mesh cell for all coils:", Jstress.n_cells, flush=True)
 
     print_adjoint_diagnostics(Jstress, args.force_kt_adjoint)
 
-    if args.drop_winkler_wa:
+    if args.drop_winkler_wa and not args.compare_wa_slice:
         drop_winkler_wa(Jstress)
 
     dofs = np.asarray(Jstress.x, dtype=float)
@@ -340,18 +456,43 @@ def main():
 
     # --- Baseline / primary: simsopt J/dJ Taylor ---
     fun_simsopt = make_simsopt_fun(Jstress)
-    dJh_s, fd_s, dJ_s = run_taylor(
-        "simsopt CoilFEMObjective.J/dJ",
-        fun_simsopt,
-        dofs,
-        h,
-        args.eps,
-    )
+    name = "simsopt CoilFEMObjective.J/dJ"
+    if args.compare_wa_slice:
+        name = "FULL model (with grounded w_a Winkler) " + name
+    dJh_s, fd_s, dJ_s = run_taylor(name, fun_simsopt, dofs, h, args.eps)
+
+    # --- Probe 4: grounded-w_a slice (full vs no-w_a in one job) ---
+    if args.compare_wa_slice:
+        Jstress.x = dofs
+        drop_winkler_wa(Jstress)
+        fun_no_wa = make_simsopt_fun(Jstress)
+        dJh_n, fd_n, _ = run_taylor(
+            "NO grounded-w_a Winkler (k = k_clamp*w_g only) simsopt J/dJ",
+            fun_no_wa,
+            dofs,
+            h,
+            args.eps,
+        )
+        if fd_s is None or fd_n is None:
+            raise RuntimeError("compare-wa-slice needs FD from both Taylor tables")
+        print_wa_slice(dJh_s, fd_s, dJh_n, fd_n)
 
     # --- Probe 3: simsopt-free jax.grad path ---
     if args.simsopt_free:
         # Taylor loop leaves Jstress.x at the last perturbation; restore.
         Jstress.x = dofs
+        # If compare-wa-slice already dropped w_a, rebuild so simsopt-free
+        # matches the primary model the user asked for.
+        if args.compare_wa_slice and not args.drop_winkler_wa:
+            print(
+                "Rebuilding problem for --simsopt-free on FULL model "
+                "(compare-wa-slice had patched stiffness).",
+                flush=True,
+            )
+            Jstress, coil_support = build_problem(
+                args.force_kt_adjoint, n_coils=args.n_coils,
+            )
+            Jstress.x = dofs
         fun_jax, free_mask = make_simsopt_free_fun(Jstress, coil_support)
         assert free_mask.sum() == dofs.size, (
             f"free mask size {free_mask.sum()} != Jstress.x size {dofs.size}"
