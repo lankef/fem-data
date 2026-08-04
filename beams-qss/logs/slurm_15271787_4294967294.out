@@ -1,0 +1,101 @@
+Job ID:         15271787
+Nodes:          1
+CPUs per task:  4
+Start time:     Tue Aug  4 15:48:04 EDT 2026
+PWD:            /scratch/lf2869/project/fem-data/beams-qss
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 82878 Aug  4 15:47 ./taylor.py
+sbatch $@:     --diagnostics-deep shared-wa
+TAYLOR_FLAGS:   
+CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
+Running: python -u ./taylor.py --diagnostics-deep shared-wa
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+taylor.py probes:
+  force_kt_adjoint = False
+  drop_winkler_wa  = False
+  simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = none
+  diagnostics      = False
+  diagnostics_deep = shared-wa
+  n_coils          = 5
+  normalize_h      = False
+  eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
+  seed             = 1
+
+===== diagnostics-deep phase=shared-wa =====
+
+----- coil-fem fingerprint -----
+  coil_fem.__file__              : /scratch/lf2869/code/coil-fem/src/coil_fem/__init__.py
+  coil_fem.coupling.drivers file : /scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+  k_live_in_drivers              : True
+  COIL_FEM_VJP_ABLATION          : ''
+WARNING: k_live_in_drivers=True — sync reverted coil-fem before interpreting shared-wa as a green light for the production fix.
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+solving with float64
+
+################################################################################
+### shared-wa A: weight consistency
+################################################################################
+
+  coil 0: max|w_a_compute - sum(w_k)|=2.775558e-17  rel=2.775558e-17  max(w_a)=1.000000e+00
+  coil 1: max|w_a_compute - sum(w_k)|=2.220446e-16  rel=2.220446e-16  max(w_a)=1.000000e+00
+  coil 2: max|w_a_compute - sum(w_k)|=3.469447e-17  rel=3.469447e-17  max(w_a)=1.000000e+00
+  coil 3: max|w_a_compute - sum(w_k)|=3.469447e-17  rel=3.469447e-17  max(w_a)=1.000000e+00
+  coil 4: max|w_a_compute - sum(w_k)|=1.110223e-16  rel=1.110223e-16  max(w_a)=1.000000e+00
+  overall max abs=2.220446e-16  max rel=2.220446e-16
+
+################################################################################
+### shared-wa B: dual vs shared λ·R at frozen u*
+################################################################################
+
+  ||R_dual - R_shared||_inf / scale = 8.881092e-06  (forward should match)
+  dual R (prod-like)                d_an=-2.9270332757e+17  FD(1e-07)=-2.9615628983e+17  an/FD=0.98834074
+  shared R (one w_k pass)           d_an=-2.9270332756e+17  FD(1e-07)=-2.9615628160e+17  an/FD=0.98834077
+
+################################################################################
+### shared-wa C: factorized ∂(λ·R)/∂w then ∂w/∂φ
+################################################################################
+
+  d_shared composed VJP     = -2.9270332756475386e+17
+  d_shared FD               = -2.9615612860984378e+17
+  d_factor (g_w·∂w/∂φ)      = -2.2608090033449096e+16
+  d_factor via FD(∂w/∂φ)    = -2.2608091584494664e+16
+  factor/shared_VJP         = 0.07723892
+  factor/shared_FD          = 0.07633842
+  shared_VJP/shared_FD      = 0.98834128
+  note: factor freezes geom/r; shared keeps geom live — ratios near 1 only if weight channel dominates this direction.
+
+=== DEEP DIAG PHASE shared-wa SUMMARY ===
+fingerprint: drivers=/scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+k_live_in_drivers: True
+n_coils: 5
+weights_consistent: True (max_rel=2.220446e-16)
+R_dual_vs_shared_rel: 8.881092e-06
+dual_lamR_an_over_FD: 0.98834074
+shared_lamR_an_over_FD: 0.98834077
+factor_over_shared_FD: 0.07633842
+  verdict: SHARED INTERMEDIATE NOT SUFFICIENT (both dual and shared still short vs FD) — revisit hypothesis
+
+Done.
+Exit code:      0
+End time:       Tue Aug  4 15:52:07 EDT 2026
