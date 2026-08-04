@@ -1,0 +1,11 @@
+[gl015.hpc.nyu.edu:1406559] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+Traceback (most recent call last):
+  File "/scratch/lf2869/project/fem-data/beams-qss/./taylor.py", line 1637, in <module>
+    main()
+  File "/scratch/lf2869/project/fem-data/beams-qss/./taylor.py", line 1537, in main
+    run_diagnostics_deep(args)
+  File "/scratch/lf2869/project/fem-data/beams-qss/./taylor.py", line 1381, in run_diagnostics_deep
+    run_deep_ablation_sum(args)
+  File "/scratch/lf2869/project/fem-data/beams-qss/./taylor.py", line 1022, in run_deep_ablation_sum
+    raise FileNotFoundError(
+FileNotFoundError: missing ablation artifact logs/deep_ablation_none_n5_s1.json; run --diagnostics-deep ablation --vjp-ablation none first

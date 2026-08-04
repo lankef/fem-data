@@ -1,0 +1,93 @@
+Job ID:         15270712
+Nodes:          1
+CPUs per task:  4
+Start time:     Tue Aug  4 15:15:52 EDT 2026
+PWD:            /scratch/lf2869/project/fem-data/beams-qss
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 61320 Aug  4 15:09 ./taylor.py
+sbatch $@:     --diagnostics-deep ablation --vjp-ablation freeze_sdofs_geom
+TAYLOR_FLAGS:   
+CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
+Running: python -u ./taylor.py --diagnostics-deep ablation --vjp-ablation freeze_sdofs_geom
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+taylor.py probes:
+  force_kt_adjoint = False
+  drop_winkler_wa  = False
+  simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = freeze_sdofs_geom
+  diagnostics      = False
+  diagnostics_deep = ablation
+  n_coils          = 5
+  normalize_h      = False
+  eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
+  seed             = 1
+Set COIL_FEM_VJP_ABLATION=freeze_sdofs_geom (read at make_merged_solve / CoilFEM construction).
+
+===== diagnostics-deep phase=ablation =====
+
+----- coil-fem fingerprint -----
+  coil_fem.__file__              : /scratch/lf2869/code/coil-fem/src/coil_fem/__init__.py
+  coil_fem.coupling.drivers file : /scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+  k_live_in_drivers              : True
+  COIL_FEM_VJP_ABLATION          : 'freeze_sdofs_geom'
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+[make_merged_solve] VJP ablation active: freeze_sdofs_geom (env COIL_FEM_VJP_ABLATION)
+
+################################################################################
+### Taylor test: DEEP ablation=freeze_sdofs_geom
+################################################################################
+
+solving with float64
+solving with float64
+J0  = 3.621655814438427e+16
+dJh = 9.608337009939812e+21
+|dJ| = 2.00163420953065e+22
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -1.0505636207e+17  -9.6084420663e+21  -9.6084420663e+25   1.000011e+00
+   1.0e-03  -1.6760201606e+17  -9.6085046120e+21  -9.6085046120e+27   1.000017e+00
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-04  -2.9326981090e+17  -9.6086302798e+21  -9.6086302798e+29   1.000031e+00
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-05  -2.9611520041e+17  -9.6086331251e+21  -9.6086331251e+31   1.000031e+00
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-06  -2.9615593747e+17  -9.6086331659e+21  -9.6086331659e+33   1.000031e+00
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-07  -2.9615621624e+17  -9.6086331662e+21  -9.6086331662e+35   1.000031e+00
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+
+summary (plateau/last eps=1.0e-07): dJh/FD = -32443.47571673  (1.0 = perfect; W7-X residual was ~0.988)
+best-eps summary: eps=1.0e-02  FD=-1.0505636207e+17  dJh/FD=-91458.87807694
+
+Wrote ablation artifact: logs/deep_ablation_freeze_sdofs_geom_n5_s1.json
+
+=== DEEP DIAG PHASE ablation SUMMARY ===
+ablation: freeze_sdofs_geom
+dJh: 9.6083370099398117e+21
+FD_plateau: -2.9615621624000000e+17
+dJh_over_FD: -32443.47571673
+Next: run freeze_k and freeze_sdofs_geom (same seed/n-coils), then --diagnostics-deep ablation-sum
+
+Done.
+Exit code:      0
+End time:       Tue Aug  4 15:32:06 EDT 2026
