@@ -1,0 +1,204 @@
+Job ID:         15269416
+Nodes:          1
+CPUs per task:  4
+Start time:     Tue Aug  4 14:29:34 EDT 2026
+PWD:            /scratch/lf2869/project/fem-data/beams-qss
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 28684 Aug  4 14:27 ./taylor.py
+sbatch $@:     --diagnostics
+TAYLOR_FLAGS:   
+CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
+Running: python -u ./taylor.py --diagnostics
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+taylor.py probes:
+  force_kt_adjoint = False
+  drop_winkler_wa  = False
+  simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = none
+  diagnostics      = True
+  n_coils          = 5
+  normalize_h      = False
+  eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
+  seed             = 1
+----- coil-fem fingerprint -----
+  coil_fem.__file__              : /scratch/lf2869/code/coil-fem/src/coil_fem/__init__.py
+  coil_fem.coupling.drivers file : /scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+  k_live_in_drivers              : True
+  COIL_FEM_VJP_ABLATION          : ''
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+----- Probe 1 diagnostics (adjoint K vs Kᵀ) -----
+  force_kt_adjoint flag : False
+  adjoint_reuses_K      : True
+  solver_KT is None     : True
+  coo_to_csr_T is None  : True
+# mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
+# mesh cell for all coils: [384, 1536, 1536, 384, 1536]
+# free dofs: (50,)
+|h| = 4.1650988714900201e+00
+dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
+
+################################################################################
+### Taylor test: DIAG full model simsopt J/dJ
+################################################################################
+
+solving with float64
+solving with float64
+J0  = 3.621655814442522e+16
+dJh = -2.927033275778428e+17
+|dJ| = 2.509777276247036e+17
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -1.0505636207e+17   1.8764696551e+17   1.8764696551e+21   6.410824e-01
+   1.0e-03  -1.6760201607e+17   1.2510131150e+17   1.2510131150e+23   4.273997e-01
+    (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-04  -2.9326981169e+17  -5.6648411352e+14  -5.6648411352e+22   1.935352e-03
+    (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-05  -2.9611520239e+17  -3.4118748142e+15  -3.4118748142e+25   1.165643e-02
+    (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-06  -2.9615591532e+17  -3.4525877462e+15  -3.4525877462e+27   1.179552e-02
+    (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-07  -2.9615646456e+17  -3.4531369822e+15  -3.4531369822e+29   1.179740e-02
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+
+summary (plateau/last eps=1.0e-07): dJh/FD = 0.98834016  (1.0 = perfect; W7-X residual was ~0.988)
+best-eps summary: eps=1.0e-04  FD=-2.9326981169e+17  dJh/FD=0.99806839
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+Dropped winkler w_a term (k_clamp=1.5150e+16, k_attachment=2.7956e+14 still used in K_cs/K_ss).
+Rebuild check: J0_full=3.6216558144425216e+16  J0_no_wa=8.5544871476717120e+15  rel_diff=7.637962e-01
+
+################################################################################
+### Taylor test: DIAG no grounded-w_a simsopt J/dJ
+################################################################################
+
+J0  = 8554487147670202.0
+dJh = -5.8054543807235224e+16
+|dJ| = 5.95583085706909e+16
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -2.7166929519e+16   3.0887614288e+16   3.0887614288e+20   5.320447e-01
+   1.0e-03  -3.1343759996e+16   2.6710783811e+16   2.6710783811e+22   4.600981e-01
+    (err ratio vs previous eps: 0.865, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-04  -6.4222299313e+16  -6.1677555054e+15  -6.1677555054e+23   1.062407e-01
+    (err ratio vs previous eps: -0.231, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-05  -5.8117101276e+16  -6.2557468765e+13  -6.2557468765e+23   1.077564e-03
+    (err ratio vs previous eps: 0.010, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-06  -5.8055203034e+16  -6.5922676478e+11  -6.5922676478e+23   1.135530e-05
+    (err ratio vs previous eps: 0.011, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-07  -5.8054579300e+16  -3.5492764776e+10  -3.5492764776e+24   6.113693e-07
+    (err ratio vs previous eps: 0.054, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+
+summary (plateau/last eps=1.0e-07): dJh/FD = 0.99999939  (1.0 = perfect; W7-X residual was ~0.988)
+best-eps summary: eps=1.0e-07  FD=-5.8054579300e+16  dJh/FD=0.99999939
+
+################################################################################
+### Grounded-w_a slice (plateau/last-eps FD)
+################################################################################
+
+  dJh_full          = -2.9270332757784282e+17
+  FD_full           = -2.9615646456000000e+17
+  dJh_full/FD_full  = 0.98834016
+  dJh_no_wa         = -5.8054543807235224e+16
+  FD_no_wa          = -5.8054579300000000e+16
+  dJh_no_wa/FD_no_wa= 0.99999939
+  dJh_wa            = FD_full - FD_no_wa     = -2.3810188526000000e+17
+  dJh_wa_analytic   = dJh_full - dJh_no_wa   = -2.3464878377060758e+17
+  analytic/FD slice = 0.98549738  (|diff|/scale=1.450262e-02)
+  |full gap| / |FD wa slice| = 0.01450277
+  interpretation    : slice magnitudes comparable (look at ratio carefully)
+
+################################################################################
+### DOF-group directional probes
+################################################################################
+
+  phis_start_cc     n_free= 20  dJh=2.181054e+16  FD(1e-02)=-4.215038e+15  dJh/FD=-5.17445882  dJh/dJh_full=-0.074514
+  phis_end_cc       n_free= 20  dJh=-1.284421e+17  FD(1e-02)=-1.065520e+17  dJh/FD=1.20544062  dJh/dJh_full=0.438813
+  phis              n_free= 10  dJh=-1.860718e+17  FD(1e-02)=-9.399461e+15  dJh/FD=19.79601048  dJh/dJh_full=0.635701
+  other             n_free=0  (skip)
+
+################################################################################
+### k(φ) grad check (outside merged_solve)
+################################################################################
+
+  d(sum k)/dh analytic = -6.8359219548172796e+19
+  d(sum k)/dh FD       = -6.8359342579712000e+19
+  analytic/FD          = 0.99999820
+
+################################################################################
+### Taylor test: DIAG simsopt-free jax.grad(fem.objective)
+################################################################################
+
+J0  = 3.621655814449237e+16
+dJh = -2.927033275722866e+17
+|dJ| = 2.5097772762444707e+17
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -1.0505636208e+17   1.8764696550e+17   1.8764696550e+21   6.410824e-01
+   1.0e-03  -1.6760201605e+17   1.2510131152e+17   1.2510131152e+23   4.273997e-01
+    (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-04  -2.9326981111e+17  -5.6648353987e+14  -5.6648353987e+22   1.935351e-03
+    (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-05  -2.9611520506e+17  -3.4118774845e+15  -3.4118774845e+25   1.165644e-02
+    (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-06  -2.9615586942e+17  -3.4525418477e+15  -3.4525418477e+27   1.179536e-02
+    (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-07  -2.9615615164e+17  -3.4528240677e+15  -3.4528240677e+29   1.179633e-02
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+
+summary (plateau/last eps=1.0e-07): dJh/FD = 0.98834120  (1.0 = perfect; W7-X residual was ~0.988)
+best-eps summary: eps=1.0e-04  FD=-2.9326981111e+17  dJh/FD=0.99806839
+
+----- Grad compare: simsopt dJ vs jax.grad fem.objective -----
+  ||a||=2.509777e+17  ||b||=2.509777e+17
+  ||a-b||/scale = 3.178127e-11
+  max|a-b| = 5.806376e+06  cos = 1.00000000
+
+=== DIAGNOSTICS SUMMARY ===
+fingerprint: drivers=/scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+k_live_in_drivers: True
+vjp_ablation_env: ''
+n_coils: 5
+baseline_dJh_over_FD: 0.98834016
+no_wa_dJh_over_FD: 0.99999939
+wa_slice_analytic_over_FD: 0.98549738
+full_gap_over_wa_fd_slice: 0.01450277
+k_grad_over_FD: 0.99999820
+group_ratios: phis_start_cc=-5.17445882 phis_end_cc=1.20544062 phis=19.79601048 other=nan
+simsopt_vs_jax_rel: 3.178127e-11
+simsopt_free_dJh_over_FD: 0.98834120
+
+Done.
+Exit code:      0
+End time:       Tue Aug  4 14:48:50 EDT 2026
