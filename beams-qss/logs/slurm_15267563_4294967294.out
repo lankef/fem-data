@@ -1,13 +1,13 @@
-Job ID:         15265466
+Job ID:         15267563
 Nodes:          1
 CPUs per task:  4
-Start time:     Tue Aug  4 12:09:50 EDT 2026
+Start time:     Tue Aug  4 13:08:09 EDT 2026
 PWD:            /scratch/lf2869/project/fem-data/beams-qss
 taylor.py:      -rw-r--r--. 1 lf2869 lf2869 19270 Aug  4 12:05 ./taylor.py
-sbatch $@:     --drop-winkler-wa
+sbatch $@:     --vjp-ablation freeze_k
 TAYLOR_FLAGS:   
 CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
-Running: python -u ./taylor.py --drop-winkler-wa
+Running: python -u ./taylor.py --vjp-ablation freeze_k
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -18,13 +18,14 @@ Running: python -u ./taylor.py --drop-winkler-wa
 
 taylor.py probes:
   force_kt_adjoint = False
-  drop_winkler_wa  = True
+  drop_winkler_wa  = False
   simsopt_free     = False
   compare_wa_slice = False
-  vjp_ablation     = none
+  vjp_ablation     = freeze_k
   n_coils          = 5
   eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
   seed             = 1
+Set COIL_FEM_VJP_ABLATION=freeze_k (read at make_merged_solve / CoilFEM construction).
 k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
 k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
 Beam network initialized.
@@ -39,6 +40,7 @@ Fixing:
     x_foundation
     thetas_orientation_cf
 Total # dofs: 50
+[make_merged_solve] VJP ablation active: freeze_k (env COIL_FEM_VJP_ABLATION)
 # mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
 # mesh cell for all coils: [384, 1536, 1536, 384, 1536]
 ----- Probe 1 diagnostics (adjoint K vs Kᵀ) -----
@@ -46,7 +48,6 @@ Total # dofs: 50
   adjoint_reuses_K      : True
   solver_KT is None     : True
   coo_to_csr_T is None  : True
-Probe 2: dropped winkler w_a term (k_clamp=1.5150e+16, k_attachment=2.7956e+14 still used in K_cs/K_ss).
 # free dofs: (50,)
 dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
 
@@ -56,26 +57,26 @@ dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1
 
 solving with float64
 solving with float64
-J0  = 8554487147672242.0
-dJh = -5.8054543807262136e+16
-|dJ| = 5.955830857069293e+16
+J0  = 3.621655814444713e+16
+dJh = -9.608629713337045e+21
+|dJ| = 2.0016316709410942e+22
 
        eps      centered diff                err          err/eps^2    |err|/|dJh|
-   1.0e-02  -2.7166929519e+16   3.0887614288e+16   3.0887614288e+20   5.320447e-01
-   1.0e-03  -3.1343759995e+16   2.6710783812e+16   2.6710783812e+22   4.600981e-01
-    (err ratio vs previous eps: 0.865, expect ~1e2 if O(eps^2))
-   1.0e-04  -6.4222299316e+16  -6.1677555084e+15  -6.1677555084e+23   1.062407e-01
-    (err ratio vs previous eps: -0.231, expect ~1e2 if O(eps^2))
-   1.0e-05  -5.8117101251e+16  -6.2557443688e+13  -6.2557443688e+23   1.077563e-03
-    (err ratio vs previous eps: 0.010, expect ~1e2 if O(eps^2))
-   1.0e-06  -5.8055201529e+16  -6.5772173786e+11  -6.5772173786e+23   1.132938e-05
-    (err ratio vs previous eps: 0.011, expect ~1e2 if O(eps^2))
-   1.0e-07  -5.8054575715e+16  -3.1907737864e+10  -3.1907737864e+24   5.496165e-07
-    (err ratio vs previous eps: 0.049, expect ~1e2 if O(eps^2))
+   1.0e-02  -1.0505636207e+17   9.6085246570e+21   9.6085246570e+25   9.999891e-01
+   1.0e-03  -1.6760201604e+17   9.6084621113e+21   9.6084621113e+27   9.999826e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-04  -2.9326981177e+17   9.6083364435e+21   9.6083364435e+29   9.999695e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-05  -2.9611520414e+17   9.6083335981e+21   9.6083335981e+31   9.999692e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-06  -2.9615599232e+17   9.6083335573e+21   9.6083335573e+33   9.999692e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-07  -2.9615596208e+17   9.6083335574e+21   9.6083335574e+35   9.999692e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
 
-summary: dJh/FD = 0.99999945  (1.0 = perfect; baseline residual was ~0.979)
-best-eps summary: eps=1.0e-07  FD=-5.8054575715e+16  dJh/FD=0.99999945
+summary: dJh/FD = 32444.49190167  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-06  FD=-2.9615599232e+17  dJh/FD=32444.48858838
 
 Done.
 Exit code:      0
-End time:       Tue Aug  4 12:24:25 EDT 2026
+End time:       Tue Aug  4 13:19:24 EDT 2026
