@@ -1,0 +1,89 @@
+Job ID:         15276644
+Nodes:          1
+CPUs per task:  4
+Start time:     Tue Aug  4 17:43:26 EDT 2026
+PWD:            /scratch/lf2869/project/fem-data/beams-qss
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 82878 Aug  4 15:47 ./taylor.py
+sbatch $@:     
+TAYLOR_FLAGS:   
+CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
+Running: python -u ./taylor.py 
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+taylor.py probes:
+  force_kt_adjoint = False
+  drop_winkler_wa  = False
+  simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = none
+  diagnostics      = False
+  diagnostics_deep = None
+  n_coils          = 5
+  normalize_h      = False
+  eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
+  seed             = 1
+----- coil-fem fingerprint -----
+  coil_fem.__file__              : /scratch/lf2869/code/coil-fem/src/coil_fem/__init__.py
+  coil_fem.coupling.drivers file : /scratch/lf2869/code/coil-fem/src/coil_fem/coupling/drivers.py
+  k_live_in_drivers              : True
+  COIL_FEM_VJP_ABLATION          : ''
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+# mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
+# mesh cell for all coils: [384, 1536, 1536, 384, 1536]
+----- Probe 1 diagnostics (adjoint K vs Kᵀ) -----
+  force_kt_adjoint flag : False
+  adjoint_reuses_K      : True
+  solver_KT is None     : True
+  coo_to_csr_T is None  : True
+# free dofs: (50,)
+dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
+|h| = 4.1650988714900201e+00
+
+################################################################################
+### Taylor test: simsopt CoilFEMObjective.J/dJ
+################################################################################
+
+solving with float64
+solving with float64
+J0  = 3.615726996896883e+16
+dJh = -2.8000521478002592e+17
+|dJ| = 2.4748274236215866e+17
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -1.0599627804e+17   1.7400893674e+17   1.7400893674e+21   6.214489e-01
+   1.0e-03  -1.5915206173e+17   1.2085315305e+17   1.2085315305e+23   4.316104e-01
+    (err ratio vs previous eps: 0.695, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-04  -2.7492997942e+17   5.0752353634e+15   5.0752353634e+23   1.812550e-02
+    (err ratio vs previous eps: 0.042, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-05  -2.7994675360e+17   5.8461177226e+13   5.8461177226e+23   2.087860e-04
+    (err ratio vs previous eps: 0.012, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-06  -2.8000458059e+17   6.3419202592e+11   6.3419202592e+23   2.264929e-06
+    (err ratio vs previous eps: 0.011, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+   1.0e-07  -2.8000511516e+17   9.9620025920e+10   9.9620025920e+24   3.557792e-07
+    (err ratio vs previous eps: 0.157, expect ~1e2 if O(eps^2); ~1 if systematic bias)
+
+summary (plateau/last eps=1.0e-07): dJh/FD = 1.00000036  (1.0 = perfect; W7-X residual was ~0.988)
+best-eps summary: eps=1.0e-07  FD=-2.8000511516e+17  dJh/FD=1.00000036
+
+Done.
+Exit code:      0
+End time:       Tue Aug  4 17:54:31 EDT 2026
