@@ -1,13 +1,13 @@
-Job ID:         15262922
+Job ID:         15265464
 Nodes:          1
 CPUs per task:  4
-Start time:     Tue Aug  4 09:55:29 EDT 2026
+Start time:     Tue Aug  4 12:07:31 EDT 2026
 PWD:            /scratch/lf2869/project/fem-data/beams-qss
-taylor.py:      -rw-r--r--. 1 lf2869 lf2869 13226 Aug  4 09:50 ./taylor.py
-sbatch $@:     --simsopt-free
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 19270 Aug  4 12:05 ./taylor.py
+sbatch $@:     
 TAYLOR_FLAGS:   
 CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
-Running: python -u ./taylor.py --simsopt-free
+Running: python -u ./taylor.py 
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -19,7 +19,10 @@ Running: python -u ./taylor.py --simsopt-free
 taylor.py probes:
   force_kt_adjoint = False
   drop_winkler_wa  = False
-  simsopt_free     = True
+  simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = none
+  n_coils          = 5
   eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
   seed             = 1
 k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
@@ -52,28 +55,26 @@ dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1
 
 solving with float64
 solving with float64
-J0  = 3.621655814438849e+16
-dJh = -2.927033275581366e+17
-|dJ| = 2.5097772762438262e+17
+J0  = 3.62165581444627e+16
+dJh = -2.927033275662144e+17
+|dJ| = 2.509777276244405e+17
 
        eps      centered diff                err          err/eps^2    |err|/|dJh|
    1.0e-02  -1.0505636207e+17   1.8764696549e+17   1.8764696549e+21   6.410824e-01
-   1.0e-03  -1.6760201607e+17   1.2510131149e+17   1.2510131149e+23   4.273997e-01
+   1.0e-03  -1.6760201605e+17   1.2510131152e+17   1.2510131152e+23   4.273997e-01
     (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2))
-   1.0e-04  -2.9326981202e+17  -5.6648446162e+14  -5.6648446162e+22   1.935354e-03
+   1.0e-04  -2.9326981099e+17  -5.6648341963e+14  -5.6648341963e+22   1.935350e-03
     (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2))
-   1.0e-05  -2.9611520048e+17  -3.4118729203e+15  -3.4118729203e+25   1.165642e-02
+   1.0e-05  -2.9611520129e+17  -3.4118737242e+15  -3.4118737242e+25   1.165642e-02
     (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2))
-   1.0e-06  -2.9615593092e+17  -3.4526033579e+15  -3.4526033579e+27   1.179557e-02
+   1.0e-06  -2.9615596211e+17  -3.4526345418e+15  -3.4526345418e+27   1.179568e-02
     (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2))
-   1.0e-07  -2.9615609448e+17  -3.4527669219e+15  -3.4527669219e+29   1.179613e-02
+   1.0e-07  -2.9615675800e+17  -3.4534304338e+15  -3.4534304338e+29   1.179840e-02
     (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
 
-summary: dJh/FD = 0.98834140  (1.0 = perfect; baseline residual was ~0.979)
+summary: dJh/FD = 0.98833918  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-04  FD=-2.9326981099e+17  dJh/FD=0.99806839
 
-################################################################################
-### Taylor test: simsopt-free jax.grad(fem.objective)
-################################################################################
-
-Exit code:      1
-End time:       Tue Aug  4 10:02:30 EDT 2026
+Done.
+Exit code:      0
+End time:       Tue Aug  4 12:14:26 EDT 2026

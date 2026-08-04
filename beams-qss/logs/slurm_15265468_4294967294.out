@@ -1,13 +1,13 @@
-Job ID:         15262919
+Job ID:         15265468
 Nodes:          1
 CPUs per task:  4
-Start time:     Tue Aug  4 09:51:48 EDT 2026
+Start time:     Tue Aug  4 12:15:27 EDT 2026
 PWD:            /scratch/lf2869/project/fem-data/beams-qss
-taylor.py:      -rw-r--r--. 1 lf2869 lf2869 13226 Aug  4 09:50 ./taylor.py
-sbatch $@:     
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 19270 Aug  4 12:05 ./taylor.py
+sbatch $@:     --vjp-ablation freeze_k
 TAYLOR_FLAGS:   
 CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
-Running: python -u ./taylor.py 
+Running: python -u ./taylor.py --vjp-ablation freeze_k
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -20,8 +20,12 @@ taylor.py probes:
   force_kt_adjoint = False
   drop_winkler_wa  = False
   simsopt_free     = False
+  compare_wa_slice = False
+  vjp_ablation     = freeze_k
+  n_coils          = 5
   eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
   seed             = 1
+Set COIL_FEM_VJP_ABLATION=freeze_k (read at make_merged_solve / CoilFEM construction).
 k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
 k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
 Beam network initialized.
@@ -36,6 +40,7 @@ Fixing:
     x_foundation
     thetas_orientation_cf
 Total # dofs: 50
+[make_merged_solve] VJP ablation active: freeze_k (env COIL_FEM_VJP_ABLATION)
 # mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
 # mesh cell for all coils: [384, 1536, 1536, 384, 1536]
 ----- Probe 1 diagnostics (adjoint K vs Kᵀ) -----
@@ -52,25 +57,26 @@ dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1
 
 solving with float64
 solving with float64
-J0  = 3.6216558144596696e+16
-dJh = -2.927033275554843e+17
-|dJ| = 2.5097772762479027e+17
+J0  = 3.6216558144440616e+16
+dJh = -9.608629713284983e+21
+|dJ| = 2.0016316709269196e+22
 
        eps      centered diff                err          err/eps^2    |err|/|dJh|
-   1.0e-02  -1.0505636207e+17   1.8764696549e+17   1.8764696549e+21   6.410824e-01
-   1.0e-03  -1.6760201601e+17   1.2510131155e+17   1.2510131155e+23   4.273997e-01
-    (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2))
-   1.0e-04  -2.9326981112e+17  -5.6648356488e+14  -5.6648356488e+22   1.935351e-03
-    (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2))
-   1.0e-05  -2.9611520496e+17  -3.4118774021e+15  -3.4118774021e+25   1.165644e-02
-    (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2))
-   1.0e-06  -2.9615592264e+17  -3.4525950805e+15  -3.4525950805e+27   1.179554e-02
-    (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2))
-   1.0e-07  -2.9615598612e+17  -3.4526585645e+15  -3.4526585645e+29   1.179576e-02
+   1.0e-02  -1.0505636207e+17   9.6085246569e+21   9.6085246569e+25   9.999891e-01
+   1.0e-03  -1.6760201607e+17   9.6084621113e+21   9.6084621113e+27   9.999826e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-04  -2.9326981160e+17   9.6083364435e+21   9.6083364435e+29   9.999695e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-05  -2.9611520279e+17   9.6083335981e+21   9.6083335981e+31   9.999692e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-06  -2.9615591063e+17   9.6083335574e+21   9.6083335574e+33   9.999692e-01
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+   1.0e-07  -2.9615636464e+17   9.6083335569e+21   9.6083335569e+35   9.999692e-01
     (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
 
-summary: dJh/FD = 0.98834176  (1.0 = perfect; baseline residual was ~0.979)
+summary: dJh/FD = 32444.44780029  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-07  FD=-2.9615636464e+17  dJh/FD=32444.44780029
 
 Done.
 Exit code:      0
-End time:       Tue Aug  4 09:58:46 EDT 2026
+End time:       Tue Aug  4 12:23:03 EDT 2026

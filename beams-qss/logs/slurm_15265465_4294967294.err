@@ -1,0 +1,10 @@
+[gl002.hpc.nyu.edu:1581071] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+2026-08-04 12:17:41.518330: E external/xla/xla/service/slow_operation_alarm.cc:73] 
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+2026-08-04 12:22:10.513402: E external/xla/xla/service/slow_operation_alarm.cc:140] The operation took 6m28.995227843s
+
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************

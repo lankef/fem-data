@@ -1,13 +1,13 @@
-Job ID:         15262920
+Job ID:         15265465
 Nodes:          1
 CPUs per task:  4
-Start time:     Tue Aug  4 09:52:02 EDT 2026
+Start time:     Tue Aug  4 12:09:49 EDT 2026
 PWD:            /scratch/lf2869/project/fem-data/beams-qss
-taylor.py:      -rw-r--r--. 1 lf2869 lf2869 13226 Aug  4 09:50 ./taylor.py
-sbatch $@:     --force-kt-adjoint
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 19270 Aug  4 12:05 ./taylor.py
+sbatch $@:     --compare-wa-slice
 TAYLOR_FLAGS:   
 CONDA_PREFIX:   /scratch/lf2869/conda_envs/desc
-Running: python -u ./taylor.py --force-kt-adjoint
+Running: python -u ./taylor.py --compare-wa-slice
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -17,9 +17,12 @@ Running: python -u ./taylor.py --force-kt-adjoint
                                                                               
 
 taylor.py probes:
-  force_kt_adjoint = True
+  force_kt_adjoint = False
   drop_winkler_wa  = False
   simsopt_free     = False
+  compare_wa_slice = True
+  vjp_ablation     = none
+  n_coils          = 5
   eps              = [0.01, 0.001, 0.0001, 1e-05, 1e-06, 1e-07]
   seed             = 1
 k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
@@ -39,38 +42,79 @@ Total # dofs: 50
 # mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
 # mesh cell for all coils: [384, 1536, 1536, 384, 1536]
 ----- Probe 1 diagnostics (adjoint K vs Kᵀ) -----
-  force_kt_adjoint flag : True
-  adjoint_reuses_K      : False
-  solver_KT is None     : False
-  coo_to_csr_T is None  : False
+  force_kt_adjoint flag : False
+  adjoint_reuses_K      : True
+  solver_KT is None     : True
+  coo_to_csr_T is None  : True
 # free dofs: (50,)
 dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
 
 ################################################################################
-### Taylor test: simsopt CoilFEMObjective.J/dJ
+### Taylor test: FULL model (with grounded w_a Winkler) simsopt CoilFEMObjective.J/dJ
 ################################################################################
 
 solving with float64
 solving with float64
-J0  = 3.621655814450111e+16
-dJh = -2.9270332756610304e+17
-|dJ| = 2.5097772762492634e+17
+J0  = 3.621655814444475e+16
+dJh = -2.9270332757414266e+17
+|dJ| = 2.5097772762464707e+17
+
+       eps      centered diff                err          err/eps^2    |err|/|dJh|
+   1.0e-02  -1.0505636207e+17   1.8764696551e+17   1.8764696551e+21   6.410824e-01
+   1.0e-03  -1.6760201601e+17   1.2510131157e+17   1.2510131157e+23   4.273997e-01
+    (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2))
+   1.0e-04  -2.9326981086e+17  -5.6648328602e+14  -5.6648328602e+22   1.935350e-03
+    (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2))
+   1.0e-05  -2.9611520069e+17  -3.4118731135e+15  -3.4118731135e+25   1.165642e-02
+    (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2))
+   1.0e-06  -2.9615587754e+17  -3.4525499699e+15  -3.4525499699e+27   1.179539e-02
+    (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2))
+   1.0e-07  -2.9615622632e+17  -3.4528987459e+15  -3.4528987459e+29   1.179658e-02
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+
+summary: dJh/FD = 0.98834096  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-04  FD=-2.9326981086e+17  dJh/FD=0.99806839
+Probe 2: dropped winkler w_a term (k_clamp=1.5150e+16, k_attachment=2.7956e+14 still used in K_cs/K_ss).
+
+################################################################################
+### Taylor test: NO grounded-w_a Winkler (k = k_clamp*w_g only) simsopt J/dJ
+################################################################################
+
+J0  = 3.621655814452553e+16
+dJh = -2.9270332756392166e+17
+|dJ| = 2.5097772762364166e+17
 
        eps      centered diff                err          err/eps^2    |err|/|dJh|
    1.0e-02  -1.0505636207e+17   1.8764696550e+17   1.8764696550e+21   6.410824e-01
-   1.0e-03  -1.6760201601e+17   1.2510131156e+17   1.2510131156e+23   4.273997e-01
+   1.0e-03  -1.6760201604e+17   1.2510131152e+17   1.2510131152e+23   4.273997e-01
     (err ratio vs previous eps: 0.667, expect ~1e2 if O(eps^2))
-   1.0e-04  -2.9326981126e+17  -5.6648369318e+14  -5.6648369318e+22   1.935351e-03
+   1.0e-04  -2.9326981184e+17  -5.6648427996e+14  -5.6648427996e+22   1.935353e-03
     (err ratio vs previous eps: -0.005, expect ~1e2 if O(eps^2))
-   1.0e-05  -2.9611520462e+17  -3.4118770579e+15  -3.4118770579e+25   1.165643e-02
+   1.0e-05  -2.9611520438e+17  -3.4118768169e+15  -3.4118768169e+25   1.165643e-02
     (err ratio vs previous eps: 6.023, expect ~1e2 if O(eps^2))
-   1.0e-06  -2.9615594338e+17  -3.4526158139e+15  -3.4526158139e+27   1.179562e-02
+   1.0e-06  -2.9615595972e+17  -3.4526321601e+15  -3.4526321601e+27   1.179567e-02
     (err ratio vs previous eps: 1.012, expect ~1e2 if O(eps^2))
-   1.0e-07  -2.9615606076e+17  -3.4527331939e+15  -3.4527331939e+29   1.179602e-02
+   1.0e-07  -2.9615629908e+17  -3.4529715161e+15  -3.4529715161e+29   1.179683e-02
     (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
 
-summary: dJh/FD = 0.98834151  (1.0 = perfect; baseline residual was ~0.979)
+summary: dJh/FD = 0.98834071  (1.0 = perfect; baseline residual was ~0.979)
+best-eps summary: eps=1.0e-04  FD=-2.9326981184e+17  dJh/FD=0.99806839
+
+################################################################################
+### Grounded-w_a slice (compare-wa-slice)
+################################################################################
+
+  dJh_full          = -2.9270332757414266e+17
+  FD_full           = -2.9326981086016000e+17
+  dJh_full/FD_full  = 0.99806839
+  dJh_no_wa         = -2.9270332756392166e+17
+  FD_no_wa          = -2.9326981184388000e+17
+  dJh_no_wa/FD_no_wa= 0.99806839
+  dJh_wa            = FD_full - FD_no_wa     = 9.8372000000000000e+08
+  dJh_wa_analytic   = dJh_full - dJh_no_wa   = -1.0220992000000000e+07
+  analytic/FD slice = -0.01039014  (|diff|/scale=1.010390e+00)
+  interpretation    : UNDER-differentiated grounded-w_a path (most likely)
 
 Done.
 Exit code:      0
-End time:       Tue Aug  4 09:58:47 EDT 2026
+End time:       Tue Aug  4 12:23:21 EDT 2026
