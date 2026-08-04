@@ -1,0 +1,19 @@
+Job ID:         15245784
+Nodes:          1
+CPUs per task:  4
+Start time:     Mon Aug  3 21:26:18 EDT 2026
+PWD:            /scratch/lf2869/project/fem-data/beams-qss
+taylor.py:      -rw-r--r--. 1 lf2869 lf2869 13129 Aug  3 21:25 ./taylor.py
+Args:           
+# Taylor / gradient probes for the support-only setup in ./proto.py.
+#
+# Baseline: centered-difference Taylor test on CoilFEMObjective.J/dJ
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+End time:       Mon Aug  3 21:26:46 EDT 2026
