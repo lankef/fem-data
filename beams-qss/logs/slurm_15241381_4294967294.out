@@ -1,7 +1,7 @@
-Job ID:         15241249
+Job ID:         15241381
 Nodes:          1
 CPUs per task:  4
-Start time:     Mon Aug  3 19:49:38 EDT 2026
+Start time:     Mon Aug  3 20:09:17 EDT 2026
        __       ___      ___   ___                _______  _______ .___  ___. 
       |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
       |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
@@ -35,19 +35,19 @@ Total # dofs: 50
 dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
 solving with float64
 solving with float64
-J0  = 3.621655814453339e+16
-dJh = -1.6318043215699968e+17
+J0  = 3.621655814442267e+16
+dJh = -1.6318043214106374e+17
 
        eps      centered diff                err          err/eps^2
-   1.0e-02  -9.7090984182e+15   1.5347133374e+17   1.5347133374e+21
-   1.0e-03  -8.7110920292e+16   7.6069511865e+16   7.6069511865e+22
+   1.0e-02  -9.7090984091e+15   1.5347133373e+17   1.5347133373e+21
+   1.0e-03  -8.7110920300e+16   7.6069511842e+16   7.6069511842e+22
     (err ratio vs previous eps: 0.496, expect ~1e2 if O(eps^2))
-   1.0e-04  -1.6604141868e+17  -2.8609865220e+15  -2.8609865220e+23
+   1.0e-04  -1.6604141764e+17  -2.8609855031e+15  -2.8609855031e+23
     (err ratio vs previous eps: -0.038, expect ~1e2 if O(eps^2))
-   1.0e-05  -1.6672967398e+17  -3.5492418194e+15  -3.5492418194e+25
+   1.0e-05  -1.6672967635e+17  -3.5492442093e+15  -3.5492442093e+25
     (err ratio vs previous eps: 1.241, expect ~1e2 if O(eps^2))
-   1.0e-06  -1.6673162060e+17  -3.5511884470e+15  -3.5511884470e+27
+   1.0e-06  -1.6673155419e+17  -3.5511220509e+15  -3.5511220509e+27
     (err ratio vs previous eps: 1.001, expect ~1e2 if O(eps^2))
-   1.0e-07  -1.6673077624e+17  -3.5503440830e+15  -3.5503440830e+29
+   1.0e-07  -1.6673198364e+17  -3.5515514989e+15  -3.5515514989e+29
     (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
-End time:       Mon Aug  3 19:56:40 EDT 2026
+End time:       Mon Aug  3 20:16:54 EDT 2026
