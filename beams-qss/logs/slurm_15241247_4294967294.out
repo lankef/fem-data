@@ -1,0 +1,53 @@
+Job ID:         15241247
+Nodes:          1
+CPUs per task:  4
+Start time:     Mon Aug  3 19:49:07 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 2.7956e+14 N/m3.
+k_clamp is not provided. Based on the coil's stiffness, the auto-generated value is      1.5150e+16 N/m3.
+Beam network initialized.
+Optimizing:
+    phis_end_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis_start_cc - per-coil shapes: [(4,), (4,), (4,), (4,), (2,), (2,)]
+    phis - per-coil shapes: (5, 2)
+Fixing:
+    thetas_orientation_cc
+    r_beam
+    phis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 50
+# mesh node for all coils: [1152, 3200, 3200, 1152, 3200]
+# mesh cell for all coils: [384, 1536, 1536, 384, 1536]
+
+################################################################################
+### Perform a Taylor test #####################################################
+################################################################################
+
+# free dofs: (50,)
+dof names  : ['CoilSupportBeams1:x0', 'CoilSupportBeams1:x1', 'CoilSupportBeams1:x2', 'CoilSupportBeams1:x3', 'CoilSupportBeams1:x4', 'CoilSupportBeams1:x5', 'CoilSupportBeams1:x6', 'CoilSupportBeams1:x7', 'CoilSupportBeams1:x8', 'CoilSupportBeams1:x9', 'CoilSupportBeams1:x10', 'CoilSupportBeams1:x11', 'CoilSupportBeams1:x12', 'CoilSupportBeams1:x13', 'CoilSupportBeams1:x14', 'CoilSupportBeams1:x15', 'CoilSupportBeams1:x16', 'CoilSupportBeams1:x17', 'CoilSupportBeams1:x18', 'CoilSupportBeams1:x19', 'CoilSupportBeams1:x20', 'CoilSupportBeams1:x21', 'CoilSupportBeams1:x22', 'CoilSupportBeams1:x23', 'CoilSupportBeams1:x24', 'CoilSupportBeams1:x25', 'CoilSupportBeams1:x26', 'CoilSupportBeams1:x27', 'CoilSupportBeams1:x28', 'CoilSupportBeams1:x29', 'CoilSupportBeams1:x30', 'CoilSupportBeams1:x31', 'CoilSupportBeams1:x32', 'CoilSupportBeams1:x33', 'CoilSupportBeams1:x34', 'CoilSupportBeams1:x35', 'CoilSupportBeams1:x36', 'CoilSupportBeams1:x37', 'CoilSupportBeams1:x38', 'CoilSupportBeams1:x39', 'CoilSupportBeams1:x40', 'CoilSupportBeams1:x41', 'CoilSupportBeams1:x42', 'CoilSupportBeams1:x43', 'CoilSupportBeams1:x44', 'CoilSupportBeams1:x45', 'CoilSupportBeams1:x46', 'CoilSupportBeams1:x47', 'CoilSupportBeams1:x48', 'CoilSupportBeams1:x49']
+solving with float64
+solving with float64
+J0  = 3.621655814449336e+16
+dJh = -1.631804321535006e+17
+
+       eps      centered diff                err          err/eps^2
+   1.0e-02  -9.7090984138e+15   1.5347133374e+17   1.5347133374e+21
+   1.0e-03  -8.7110920330e+16   7.6069511824e+16   7.6069511824e+22
+    (err ratio vs previous eps: 0.496, expect ~1e2 if O(eps^2))
+   1.0e-04  -1.6604141849e+17  -2.8609863323e+15  -2.8609863323e+23
+    (err ratio vs previous eps: -0.038, expect ~1e2 if O(eps^2))
+   1.0e-05  -1.6672967123e+17  -3.5492390789e+15  -3.5492390789e+25
+    (err ratio vs previous eps: 1.241, expect ~1e2 if O(eps^2))
+   1.0e-06  -1.6673157140e+17  -3.5511392505e+15  -3.5511392505e+27
+    (err ratio vs previous eps: 1.001, expect ~1e2 if O(eps^2))
+   1.0e-07  -1.6673124964e+17  -3.5508174865e+15  -3.5508174865e+29
+    (err ratio vs previous eps: 1.000, expect ~1e2 if O(eps^2))
+End time:       Mon Aug  3 19:56:20 EDT 2026
