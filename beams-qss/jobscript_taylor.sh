@@ -20,6 +20,12 @@ echo "Nodes:          $SLURM_JOB_NUM_NODES"
 echo "CPUs per task:  $SLURM_CPUS_PER_TASK"
 echo "Start time:     $(date)"
 conda activate desc
-python -u ./taylor.py
+
+# Baseline Taylor (simsopt J/dJ). Optional probes for the ~2% grad gap:
+#   --force-kt-adjoint   # (1) adjoint uses Kᵀ instead of reused K
+#   --drop-winkler-wa    # (2) drop grounded k_attachment*w_a Winkler term
+#   --simsopt-free       # (3) also Taylor jax.grad(fem.objective)
+# Pass extra flags via: sbatch --export=ALL,TAYLOR_FLAGS="--force-kt-adjoint" ...
+python -u ./taylor.py ${TAYLOR_FLAGS:-}
 
 echo "End time:       $(date)"
