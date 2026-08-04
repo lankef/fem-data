@@ -1,0 +1,12 @@
+[gl060.hpc.nyu.edu:590559] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+/scratch/lf2869/code/coil-fem/src/coil_fem/coil_fem.py:330: UserWarning: cudss_mtype_id=0 overrides derived merged value 1 (from weakest of ['symmetric', 'symmetric', 'symmetric', 'symmetric', 'symmetric', 'symmetric']). Verify this is intentional.
+  self.monolithic_static = self.build_monolithic_static(
+2026-08-04 09:57:25.479900: E external/xla/xla/service/slow_operation_alarm.cc:73] 
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+2026-08-04 09:58:11.744356: E external/xla/xla/service/slow_operation_alarm.cc:140] The operation took 2m46.264572558s
+
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
