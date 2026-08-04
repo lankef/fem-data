@@ -27,6 +27,7 @@
 #   sbatch jobscript_taylor.sh --diagnostics-deep surgical --vjp-ablation freeze_wa_in_k
 #   sbatch jobscript_taylor.sh --diagnostics-deep surgical --vjp-ablation freeze_wa_in_coupling
 #   sbatch jobscript_taylor.sh --diagnostics-deep ift
+#   sbatch jobscript_taylor.sh --diagnostics-deep shared-wa
 #   sbatch jobscript_taylor.sh --diagnostics-deep scale --n-coils 1
 #   sbatch jobscript_taylor.sh --diagnostics-deep scale --n-coils 5
 #

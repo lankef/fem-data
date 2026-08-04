@@ -15,17 +15,20 @@
 #                            wa-slice, DOF-group masks, k(φ) check, simsopt-free)
 #   7) --diagnostics-deep PHASE  (phased deep suite; see notes/WINKLER_WA_VJP.md)
 #        groups | residual | ablation | ablation-sum | surgical | ift | scale
+#        | shared-wa
 #
 # Examples:
 #   python -u ./taylor.py
 #   python -u ./taylor.py --diagnostics
 #   python -u ./taylor.py --diagnostics-deep groups
 #   python -u ./taylor.py --diagnostics-deep residual
+#   python -u ./taylor.py --diagnostics-deep shared-wa
 #   python -u ./taylor.py --diagnostics-deep ablation --vjp-ablation freeze_k
 #   python -u ./taylor.py --compare-wa-slice
 #   python -u ./taylor.py --drop-winkler-wa
 #   sbatch jobscript_taylor.sh --diagnostics
 #   sbatch jobscript_taylor.sh --diagnostics-deep residual
+#   sbatch jobscript_taylor.sh --diagnostics-deep shared-wa
 
 from __future__ import annotations
 
@@ -105,6 +108,7 @@ def parse_args():
             "surgical",
             "ift",
             "scale",
+            "shared-wa",
         ),
         default=None,
         help="Probe 7: phased deep diagnostics (one phase per job).",
@@ -1367,6 +1371,516 @@ def run_deep_scale(args):
     )
 
 
+def run_deep_shared_wa(args):
+    """Pre-fix probes: weight consistency, dual vs shared R, factorized ∂/∂w_a.
+
+    Discriminates the shared-attachment-weight hypothesis before changing
+    production ``make_merged_solve``.  Skim ``=== DEEP DIAG PHASE shared-wa SUMMARY ===``.
+    """
+    from coil_fem.coupling.beam_network import EndpointResult, _skew
+    from coil_fem.metrics import l2_von_mises
+    from coil_fem.solvers.cudss import assemble_csr_values
+
+    fp = print_coil_fem_fingerprint()
+    if fp["k_live_in_drivers"]:
+        print(
+            "WARNING: k_live_in_drivers=True — sync reverted coil-fem before "
+            "interpreting shared-wa as a green light for the production fix.",
+            flush=True,
+        )
+
+    J, cs = build_problem(args.force_kt_adjoint, n_coils=args.n_coils)
+    dofs = np.asarray(J.x, dtype=float)
+    h = make_direction_h(dofs, args.seed, args.normalize_h)
+    J.x = dofs
+    fem = J.fem
+    support = fem.support
+    static = fem.monolithic_static
+    if static is None or static.merged_solve is None:
+        raise RuntimeError("shared-wa requires monolithic cuDSS merged_solve")
+    if J._metrics[0] != "l2_von_mises":
+        raise NotImplementedError("shared-wa expects l2_von_mises metric")
+
+    out = J.run()
+    sol_flat = _sol_flat_from_run(fem, out)
+    cdofs0 = [jnp.asarray(c.get_dofs()) for c in cs.base_curves]
+    curves_live0 = fem.curves_from_dofs(cdofs0)
+    n_base = len(cdofs0)
+    pts0 = [fem.meshes[i].mesh_points_from_dofs(cdofs0[i]) for i in range(n_base)]
+    bf0 = [jnp.asarray(out["f_vol"][i]) for i in range(n_base)]
+    fe_geom0 = [fem._jit_fe_geom_fns[i](pts0[i]) for i in range(n_base)]
+    _, _, sdofs_from_free, x0 = _pack_free_helpers(cs, dofs)
+    h_j = jnp.asarray(h, dtype=jnp.float64)
+
+    coil_dof_offsets = static.coil_dof_offsets
+    n_dofs_per_coil = static.n_dofs_per_coil
+    support_dof_offset = static.support_dof_offset
+    n_s = static.n_s
+    has_cs, has_sc = static.has_cs, static.has_sc
+    I_cs = jnp.asarray(static.I_cs_pat) if has_cs else None
+    J_cs = jnp.asarray(static.J_cs_pat) if has_cs else None
+    I_sc = jnp.asarray(static.I_sc_pat) if has_sc else None
+    J_sc = jnp.asarray(static.J_sc_pat) if has_sc else None
+    pipelines = fem.pipelines
+    surf_interp = [
+        (
+            pipelines[i].problem._sel_face_sv,
+            pipelines[i].problem._surf_face_to_surf_node,
+            int(pipelines[i].problem._surf_unique_global_nodes.shape[0]),
+        )
+        for i in range(n_base)
+    ]
+    s_quad0 = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+    jxw0 = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+    weight = float(J._metric_weights[0])
+    eps_fd = float(min(e for e in args.eps if e <= 1e-4) or min(args.eps))
+
+    # ------------------------------------------------------------------
+    # A — weight consistency: compute_weights w_a vs sum(_clamp_weights)
+    # ------------------------------------------------------------------
+    print(f"\n{'#' * 80}\n### shared-wa A: weight consistency\n{'#' * 80}\n", flush=True)
+    sdofs0 = sdofs_from_free(x0)
+    geom0 = support.beam_geometry(curves_live0, sdofs0)
+    specs0, specs_by_coil0 = support._endpoint_specs(geom0, geom0["gamma3"])
+    max_abs = 0.0
+    max_rel = 0.0
+    for i in range(n_base):
+        w_g_i, w_a_i = fem._support_weights(
+            i, pts0[i], curves_live0, sdofs0, geom=geom0,
+        )
+        w_a_sum = jnp.zeros_like(w_a_i)
+        for spec in specs_by_coil0.get(i, []):
+            w_k, _ = support._clamp_weights_for_spec(spec, s_quad0[i], sdofs0)
+            w_a_sum = w_a_sum + w_k
+        diff = jnp.max(jnp.abs(w_a_i - w_a_sum))
+        scale = max(float(jnp.max(jnp.abs(w_a_i))), 1.0)
+        rel = float(diff) / scale
+        max_abs = max(max_abs, float(diff))
+        max_rel = max(max_rel, rel)
+        print(
+            f"  coil {i}: max|w_a_compute - sum(w_k)|={float(diff):.6e}  "
+            f"rel={rel:.6e}  max(w_a)={float(jnp.max(w_a_i)):.6e}",
+            flush=True,
+        )
+    print(f"  overall max abs={max_abs:.6e}  max rel={max_rel:.6e}", flush=True)
+    weights_ok = max_rel < 1e-12
+
+    # ------------------------------------------------------------------
+    # Helpers: dual R (production-like) vs shared-endpoint R
+    # ------------------------------------------------------------------
+    def _coil_residual_from_k(k_list):
+        residuals = []
+        for i, pipeline in enumerate(pipelines):
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k_list[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            u_c_i = sol_flat[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(pipeline.problem.fes[0].num_total_nodes, 3)
+            pipeline.problem.set_params(p_par)
+            res_i = pipeline.problem.compute_residual_vars(
+                [u_c_i],
+                pipeline.problem.internal_vars,
+                pipeline.problem.internal_vars_surfaces,
+            )
+            residuals.append(ravel_pytree(res_i)[0])
+        return jnp.concatenate(residuals)
+
+    def _coupling_from_wr(specs, w_list, r_list, jxw_by_coil):
+        """K_cs/K_sc residual contribution from precomputed (w_k, r_k)."""
+        V_cs_parts, V_sc_parts = [], []
+        for spec, w_k, r_k in zip(specs, w_list, r_list):
+            coil_i = spec.coil
+            Q = support._tfm_Q[spec.tfm]
+            Qinv = Q.T
+            face_sv, face_to_surf_node, n_surf_nodes = surf_interp[coil_i]
+            n_sel = face_sv.shape[0]
+            n_fq = face_sv.shape[1]
+            w_sq = w_k.reshape(n_sel, n_fq)
+            r_sq = r_k.reshape(n_sel, n_fq, 3)
+            skew_sq = jax.vmap(jax.vmap(_skew))(r_sq)
+            wjxw_sq = w_sq * jxw_by_coil[coil_i]
+            sv_w = jnp.einsum("sqn,sq->sn", face_sv, wjxw_sq)
+            sv_ws = jnp.einsum("sqn,sq,sqij->snij", face_sv, wjxw_sq, skew_sq)
+            n_flat = face_to_surf_node.reshape(-1)
+            w_eff = jnp.zeros(n_surf_nodes).at[n_flat].add(sv_w.reshape(-1))
+            skew_eff = jnp.zeros((n_surf_nodes, 3, 3)).at[n_flat].add(
+                sv_ws.reshape(-1, 3, 3)
+            )
+            wk = w_eff[:, None, None]
+            V_cs_parts.append(((-support.k_attachment) * wk * Qinv[None]).reshape(-1))
+            V_cs_parts.append(((support.k_attachment) * (Qinv[None] @ skew_eff)).reshape(-1))
+            V_sc_parts.append(((-support.k_attachment) * wk * Q[None]).reshape(-1))
+            V_sc_parts.append(((-support.k_attachment) * (skew_eff @ Q[None])).reshape(-1))
+        if not V_cs_parts:
+            return jnp.zeros(0), jnp.zeros(0)
+        return jnp.concatenate(V_cs_parts), jnp.concatenate(V_sc_parts)
+
+    def _foundation_endpoints(geom, sdofs):
+        """CF foundation EndpointResult entries (same as SupportBeams)."""
+        beam_eps = [[] for _ in range(support.n_beams_total)]
+        x_foundation = sdofs["x_foundation"]
+        for i in range(support.n_base):
+            for j in range(support.n_beam_cf[i]):
+                b = support._beam_offsets[i] + support.n_beam_cc[i] + j
+                x_ep = geom["x_end"][b]
+                r_fnd = x_foundation[i][j] - x_ep
+                beam_eps[b].append(EndpointResult(
+                    w=jnp.ones(1), r=r_fnd[None], jxw=jnp.ones(1),
+                    node_side=1, coil=-1, tfm="none", is_foundation=True,
+                ))
+        return beam_eps
+
+    def _R_dual(x_free):
+        """Production-like dual path: compute_weights for k, separate coupling."""
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        k_list = []
+        for i in range(n_base):
+            w_g, w_a = fem._support_weights(
+                i, pts0[i], curves_live0, sdofs, geom=geom,
+            )
+            k_list.append(support.stiffness(w_g, w_a))
+        r_c = _coil_residual_from_k(k_list)
+        s_quad = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+        jxw = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+        Iss, Jss = support.support_pattern()
+        Vss = support.support_values(
+            curves_live0, sdofs, s_quad, geom=geom, jxw_by_coil=jxw,
+        )
+        u_s = sol_flat[support_dof_offset:]
+        r_s = jnp.zeros(n_s, dtype=Vss.dtype).at[Iss].add(Vss * u_s[Jss])
+        r_full = jnp.concatenate([r_c, r_s])
+        V_cs, V_sc = support.coupling_values(
+            curves_live0, sdofs, s_quad,
+            surf_interp_by_coil=surf_interp,
+            jxw_by_coil=jxw,
+            geom=geom,
+        )
+        if has_cs:
+            r_full = r_full.at[I_cs].add(V_cs * sol_flat[J_cs])
+        if has_sc:
+            r_full = r_full.at[I_sc].add(V_sc * sol_flat[J_sc])
+        return r_full
+
+    def _endpoint_wr(sdofs, geom, s_quad):
+        specs, specs_by_coil = support._endpoint_specs(geom, geom["gamma3"])
+        w_list, r_list = [], []
+        for spec in specs:
+            w_k, r_k = support._clamp_weights_for_spec(
+                spec, s_quad[spec.coil], sdofs,
+            )
+            w_list.append(w_k)
+            r_list.append(r_k)
+        return specs, specs_by_coil, w_list, r_list
+
+    def _R_shared(x_free):
+        """Single endpoint-weight pass feeds coil k, K_ss springs, and K_cs/K_sc."""
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        s_quad = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+        jxw = [pipelines[i].problem.surface_jxw(pts0[i]) for i in range(n_base)]
+        specs, _specs_by_coil, w_list, r_list = _endpoint_wr(sdofs, geom, s_quad)
+
+        k_list = []
+        for i in range(n_base):
+            w_g, _ = fem._support_weights(
+                i, pts0[i], curves_live0, sdofs, geom=geom,
+            )
+            w_a = jnp.zeros_like(w_g)
+            for j, spec in enumerate(specs):
+                if spec.coil == i:
+                    w_a = w_a + w_list[j]
+            k_list.append(support.stiffness(w_g, w_a))
+        r_c = _coil_residual_from_k(k_list)
+
+        beam_eps = _foundation_endpoints(geom, sdofs)
+        for spec, w_k, r_k in zip(specs, w_list, r_list):
+            jxw_k = jnp.asarray(jxw[spec.coil]).reshape(-1)
+            beam_eps[spec.b].append(EndpointResult(
+                w=w_k, r=r_k, jxw=jxw_k,
+                node_side=spec.node_side, coil=spec.coil, tfm=spec.tfm,
+            ))
+        Iss, Jss = support.support_pattern()
+        Vss = support.support_values(
+            curves_live0, sdofs, s_quad, geom=geom,
+            jxw_by_coil=jxw, beam_endpoints=beam_eps,
+        )
+        u_s = sol_flat[support_dof_offset:]
+        r_s = jnp.zeros(n_s, dtype=Vss.dtype).at[Iss].add(Vss * u_s[Jss])
+        r_full = jnp.concatenate([r_c, r_s])
+        V_cs, V_sc = _coupling_from_wr(specs, w_list, r_list, jxw)
+        if has_cs:
+            r_full = r_full.at[I_cs].add(V_cs * sol_flat[J_cs])
+        if has_sc:
+            r_full = r_full.at[I_sc].add(V_sc * sol_flat[J_sc])
+        return r_full
+
+    # ------------------------------------------------------------------
+    # Adjoint λ (same construction as residual/ift); use -λ like custom_vjp
+    # ------------------------------------------------------------------
+    def J_of_sol(sol):
+        totals = 0.0
+        sdofs = sdofs0
+        geom = geom0
+        k0 = [
+            support.stiffness(*fem._support_weights(
+                i, pts0[i], curves_live0, sdofs, geom=geom,
+            ))
+            for i in range(n_base)
+        ]
+        for i, pipeline in enumerate(pipelines):
+            n_nodes = pipeline.problem.fes[0].num_total_nodes
+            u = sol[
+                coil_dof_offsets[i]:coil_dof_offsets[i] + n_dofs_per_coil[i]
+            ].reshape(n_nodes, 3)
+            p_par = {
+                "points": pts0[i],
+                "body_force": bf0[i],
+                "support_k": k0[i],
+                "_fe_geom": fe_geom0[i],
+            }
+            pipeline.problem.set_params(p_par)
+            sg, jxw, _, _ = fe_geom0[i]
+            totals = totals + l2_von_mises(
+                pipeline.problem, [u], fem._lam, fem._mu,
+                shape_grads=sg, JxW=jxw,
+            )
+        return weight * totals
+
+    g_u = jax.grad(J_of_sol)(sol_flat)
+    V_blocks = []
+    for i, pipeline in enumerate(pipelines):
+        k_i = support.stiffness(*fem._support_weights(
+            i, pts0[i], curves_live0, sdofs0, geom=geom0,
+        ))
+        p_par = {
+            "points": pts0[i],
+            "body_force": bf0[i],
+            "support_k": k_i,
+            "_fe_geom": fe_geom0[i],
+        }
+        _, _, Vi, _, _ = pipeline.assemble_coo(p_par)
+        V_blocks.append(Vi)
+    Vss0 = support.support_values(
+        curves_live0, sdofs0, s_quad0, geom=geom0, jxw_by_coil=jxw0,
+    )
+    V_blocks.append(Vss0)
+    V_cs0, V_sc0 = support.coupling_values(
+        curves_live0, sdofs0, s_quad0,
+        surf_interp_by_coil=surf_interp,
+        jxw_by_coil=jxw0,
+        geom=geom0,
+    )
+    if has_cs:
+        V_blocks.append(V_cs0)
+    if has_sc:
+        V_blocks.append(V_sc0)
+    V_merged = jnp.concatenate([jnp.asarray(v) for v in V_blocks])
+    if static.adjoint_reuses_K:
+        csr_values = assemble_csr_values(V_merged, static.coo_to_csr, static.nnz_csr)
+        lambda_flat, _ = static.solver_K(g_u, csr_values)
+    else:
+        csr_values_T = assemble_csr_values(
+            V_merged, static.coo_to_csr_T, static.nnz_csr_T,
+        )
+        lambda_flat, _ = static.solver_KT(g_u, csr_values_T)
+    # Match custom_vjp: vjp_fn(-lambda_flat)
+    cot = -lambda_flat
+
+    def _dir_ratio(name, sfn):
+        def s_alpha(alpha):
+            return sfn(x0 + alpha * h_j)
+
+        d_an = float(jax.grad(s_alpha)(0.0))
+        d_fd = float((s_alpha(eps_fd) - s_alpha(-eps_fd)) / (2.0 * eps_fd))
+        ratio = d_an / d_fd if d_fd != 0 else float("nan")
+        print(
+            f"  {name:32s}  d_an={d_an:.10e}  FD({eps_fd:.0e})={d_fd:.10e}  "
+            f"an/FD={ratio:.8f}",
+            flush=True,
+        )
+        return {"d_an": d_an, "d_fd": d_fd, "ratio": ratio}
+
+    print(f"\n{'#' * 80}\n### shared-wa B: dual vs shared λ·R at frozen u*\n{'#' * 80}\n", flush=True)
+    # Forward-value agreement dual vs shared at φ0
+    r_dual0 = _R_dual(x0)
+    r_shared0 = _R_shared(x0)
+    r_diff = float(jnp.max(jnp.abs(r_dual0 - r_shared0)))
+    r_scale = max(float(jnp.max(jnp.abs(r_dual0))), 1.0)
+    print(
+        f"  ||R_dual - R_shared||_inf / scale = {r_diff / r_scale:.6e}  "
+        f"(forward should match)",
+        flush=True,
+    )
+    rows = {}
+    rows["dual"] = _dir_ratio(
+        "dual R (prod-like)",
+        lambda x: jnp.dot(cot, _R_dual(x)),
+    )
+    rows["shared"] = _dir_ratio(
+        "shared R (one w_k pass)",
+        lambda x: jnp.dot(cot, _R_shared(x)),
+    )
+
+    # ------------------------------------------------------------------
+    # C — factorized chain rule through shared endpoint weights
+    # ------------------------------------------------------------------
+    print(f"\n{'#' * 80}\n### shared-wa C: factorized ∂(λ·R)/∂w then ∂w/∂φ\n{'#' * 80}\n", flush=True)
+
+    def _w_flat_of_x(x_free):
+        sdofs = sdofs_from_free(x_free)
+        geom = support.beam_geometry(curves_live0, sdofs)
+        s_quad = [pipelines[i].surface_quad_points(pts0[i]) for i in range(n_base)]
+        _, _, w_list, _ = _endpoint_wr(sdofs, geom, s_quad)
+        return jnp.concatenate([w.reshape(-1) for w in w_list])
+
+    # Freeze geom/sdofs/r at φ0; vary only the attachment-weight values.
+    specs_f, _specs_by_coil_f, w_list0, r_list0 = _endpoint_wr(sdofs0, geom0, s_quad0)
+    w_flat0 = jnp.concatenate([w.reshape(-1) for w in w_list0])
+    w_sizes = [int(w.size) for w in w_list0]
+
+    def _split_w(w_flat):
+        out = []
+        off = 0
+        for sz, w_ref in zip(w_sizes, w_list0):
+            out.append(w_flat[off:off + sz].reshape(w_ref.shape))
+            off += sz
+        return out
+
+    def _R_shared_w_only(w_flat):
+        """R with live w_k flat, frozen geom/sdofs/r (isolates weight channel)."""
+        w_list = _split_w(w_flat)
+        k_list = []
+        for i in range(n_base):
+            w_g, _ = fem._support_weights(
+                i, pts0[i], curves_live0, sdofs0, geom=geom0,
+            )
+            w_a = jnp.zeros_like(w_g)
+            for j, spec in enumerate(specs_f):
+                if spec.coil == i:
+                    w_a = w_a + w_list[j]
+            k_list.append(support.stiffness(w_g, w_a))
+        r_c = _coil_residual_from_k(k_list)
+        beam_eps = _foundation_endpoints(geom0, sdofs0)
+        for spec, w_k, r_k in zip(specs_f, w_list, r_list0):
+            jxw_k = jnp.asarray(jxw0[spec.coil]).reshape(-1)
+            beam_eps[spec.b].append(EndpointResult(
+                w=w_k, r=r_k, jxw=jxw_k,
+                node_side=spec.node_side, coil=spec.coil, tfm=spec.tfm,
+            ))
+        Iss, Jss = support.support_pattern()
+        Vss = support.support_values(
+            curves_live0, sdofs0, s_quad0, geom=geom0,
+            jxw_by_coil=jxw0, beam_endpoints=beam_eps,
+        )
+        u_s = sol_flat[support_dof_offset:]
+        r_s = jnp.zeros(n_s, dtype=Vss.dtype).at[Iss].add(Vss * u_s[Jss])
+        r_full = jnp.concatenate([r_c, r_s])
+        V_cs, V_sc = _coupling_from_wr(specs_f, w_list, r_list0, jxw0)
+        if has_cs:
+            r_full = r_full.at[I_cs].add(V_cs * sol_flat[J_cs])
+        if has_sc:
+            r_full = r_full.at[I_sc].add(V_sc * sol_flat[J_sc])
+        return r_full
+
+    def s_w(w_flat):
+        return jnp.dot(cot, _R_shared_w_only(w_flat))
+
+    g_w = jax.grad(s_w)(w_flat0)
+
+    def s_factor_alpha(alpha):
+        # g_w · w(φ0 + α h)  — factorized reverse through weights then φ
+        return jnp.dot(g_w, _w_flat_of_x(x0 + alpha * h_j))
+
+    d_factor = float(jax.grad(s_factor_alpha)(0.0))
+    # FD of full shared scalar (geom live) for comparison
+    def s_shared_alpha(alpha):
+        return jnp.dot(cot, _R_shared(x0 + alpha * h_j))
+
+    d_shared_an = float(jax.grad(s_shared_alpha)(0.0))
+    d_shared_fd = float(
+        (s_shared_alpha(eps_fd) - s_shared_alpha(-eps_fd)) / (2.0 * eps_fd)
+    )
+    # FD of weight-only scalar along dw = (w(φ0+εh)-w(φ0-εh))/(2ε)
+    w_p = _w_flat_of_x(x0 + eps_fd * h_j)
+    w_m = _w_flat_of_x(x0 - eps_fd * h_j)
+    d_w_fd = float(jnp.dot(g_w, (w_p - w_m) / (2.0 * eps_fd)))
+
+    print(f"  d_shared composed VJP     = {d_shared_an:.16e}", flush=True)
+    print(f"  d_shared FD               = {d_shared_fd:.16e}", flush=True)
+    print(f"  d_factor (g_w·∂w/∂φ)      = {d_factor:.16e}", flush=True)
+    print(f"  d_factor via FD(∂w/∂φ)    = {d_w_fd:.16e}", flush=True)
+    print(
+        f"  factor/shared_VJP         = {d_factor / d_shared_an:.8f}"
+        if d_shared_an else "  factor/shared_VJP = nan",
+        flush=True,
+    )
+    print(
+        f"  factor/shared_FD          = {d_factor / d_shared_fd:.8f}"
+        if d_shared_fd else "  factor/shared_FD = nan",
+        flush=True,
+    )
+    print(
+        f"  shared_VJP/shared_FD      = {d_shared_an / d_shared_fd:.8f}"
+        if d_shared_fd else "  shared_VJP/shared_FD = nan",
+        flush=True,
+    )
+    print(
+        f"  note: factor freezes geom/r; shared keeps geom live — "
+        f"ratios near 1 only if weight channel dominates this direction.",
+        flush=True,
+    )
+
+    dual_r = rows["dual"]["ratio"]
+    shared_r = rows["shared"]["ratio"]
+    print("\n=== DEEP DIAG PHASE shared-wa SUMMARY ===", flush=True)
+    print(f"fingerprint: drivers={fp['drivers']}", flush=True)
+    print(f"k_live_in_drivers: {fp['k_live_in_drivers']}", flush=True)
+    print(f"n_coils: {args.n_coils}", flush=True)
+    print(f"weights_consistent: {weights_ok} (max_rel={max_rel:.6e})", flush=True)
+    print(f"R_dual_vs_shared_rel: {r_diff / r_scale:.6e}", flush=True)
+    print(f"dual_lamR_an_over_FD: {dual_r:.8f}", flush=True)
+    print(f"shared_lamR_an_over_FD: {shared_r:.8f}", flush=True)
+    print(
+        f"factor_over_shared_FD: {d_factor / d_shared_fd:.8f}"
+        if d_shared_fd else "factor_over_shared_FD: nan",
+        flush=True,
+    )
+    if weights_ok and abs(shared_r - 1.0) < 5e-3 and abs(dual_r - 1.0) > 5e-3:
+        print(
+            "  verdict: SHARED-WA FIX JUSTIFIED "
+            "(shared residual AD matches FD; dual path still short)",
+            flush=True,
+        )
+    elif not weights_ok:
+        print(
+            "  verdict: FIX WEIGHT INCONSISTENCY FIRST "
+            "(compute_weights vs coupling _clamp_weights disagree)",
+            flush=True,
+        )
+    elif abs(shared_r - 1.0) > 5e-3 and abs(dual_r - 1.0) > 5e-3:
+        print(
+            "  verdict: SHARED INTERMEDIATE NOT SUFFICIENT "
+            "(both dual and shared still short vs FD) — revisit hypothesis",
+            flush=True,
+        )
+    elif abs(shared_r - 1.0) < 5e-3 and abs(dual_r - 1.0) < 5e-3:
+        print(
+            "  verdict: BOTH OK HERE "
+            "(gap may be outside this frozen-u* residual probe)",
+            flush=True,
+        )
+    else:
+        print(
+            "  verdict: MIXED — inspect dual vs shared ratios carefully",
+            flush=True,
+        )
+
+
 def run_diagnostics_deep(args):
     """Dispatch --diagnostics-deep PHASE."""
     phase = args.diagnostics_deep
@@ -1385,6 +1899,8 @@ def run_diagnostics_deep(args):
         run_deep_ift(args)
     elif phase == "scale":
         run_deep_scale(args)
+    elif phase == "shared-wa":
+        run_deep_shared_wa(args)
     else:
         raise ValueError(f"unknown diagnostics-deep phase: {phase}")
 
