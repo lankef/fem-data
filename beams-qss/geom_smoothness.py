@@ -32,6 +32,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -127,46 +129,18 @@ def build_geometry_only(n_coils: int, coupling: str):
     base_curves = curves[:n_coils]
     base_currents = currents[:n_coils]
 
-    mesh_options = {
-        "shape": "rect",
-        "w1": 0.2,
-        "w2": 0.2,
-        "frame": "rmf",
-        "aspect_ratio": 1.0,
-        "mesh_type": "TET10",
-    }
-    material_options = {
-        "E": 205000000000,
-        "nu": 0.3,
-        "density": 8000,
-        "itc": 0.0,
-    }
-    gravity_options = {"g_vec": (0, 0, 0)}
+    opts = json.load(open(
+        Path(__file__).resolve().parent.parent / 'beam-options.json'
+    ))
+    mesh_options = opts['mesh_options']
+    material_options = opts['material_options']
+    gravity_options = opts['gravity_options']
+    physics_options = opts['physics_options']
+    fixed_clamp_options = opts['fixed_clamp_options']
     if n_coils == 1:
-        beam_options = {
-            "n_beam_cc": 1,
-            "n_beam_cf": 1,
-            "E": material_options["E"],
-            "nu": material_options["nu"],
-            "cross_section_type": "solid_circle",
-            "attachment_type": "direct",
-        }
+        beam_options = {**opts['beam_options'], 'n_beam_cc': 1, 'n_beam_cf': 1}
     else:
-        beam_options = {
-            "n_beam_cc": 4,
-            "n_beam_cf": 0,
-            "E": material_options["E"],
-            "nu": material_options["nu"],
-            "cross_section_type": "solid_circle",
-            "attachment_type": "direct",
-        }
-    fixed_clamp_options = {
-        "enabled": True,
-        "r_clamp": 1.73 * mesh_options["w1"] / 2,
-        "n_clamp": 2,
-        "E_coil": material_options["E"],
-    }
-    physics_options = {"type": "elastic"}
+        beam_options = opts['beam_options']
 
     # No 'solver' entry: the geometry path never touches a linear solve, and
     # omitting it keeps this runnable on a CPU-only login node.
@@ -178,9 +152,9 @@ def build_geometry_only(n_coils: int, coupling: str):
         nfp=eq.boundary.nfp,
         stellsym=eq.boundary.stellsym,
         beam_options=beam_options,
-        r_beam=0.06,
+        r_beam=opts['r_beam'],
         fixed_clamp_options=fixed_clamp_options,
-        fixed_dof_names=("thetas_orientation_cc", "r_beam"),
+        fixed_dof_names=tuple(opts['fixed_dof_names']),
     )
     Jstress = CoilFEMObjective(
         coil_support,

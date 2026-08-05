@@ -1,13 +1,11 @@
 from optimization import (
-    load_eq, 
-    run_filament_free, 
-    increase_base_curve_order
+    load_eq,
+    run_filament_free,
 )
 
 # Loading config from simsopt
 from simsopt.configs import get_data
-from simsopt.geo import plot
-from coil_fem.simsopt import CoilSupportFixed, CoilSupportTopBottom
+from coil_fem.simsopt import CoilSupportFixed
 from simsopt import save
 import time
 import numpy as np

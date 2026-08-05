@@ -5,7 +5,9 @@ Fourier-continuation machinery, this module dynamically imports
 ``fixed-continuation/optimization.py`` and wraps its ``run_filament_free`` /
 ``run_continuation`` with the CoilFEMObjective parameters (mesh/material/
 gravity/problem/physics options + the ``CoilSupportBeams`` beam-network
-kwargs) recorded in ``beams-consistency/Jstress.json``.
+kwargs) from ``beam-options.json``.
+
+Shared helpers (``load_eq``, …) come from ``fem-data/opt_utils.py``.
 """
 
 import importlib.util
@@ -15,50 +17,38 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
-# ── Read Jstress.json's stored constructor parameters ───────────────────────
-# Simsopt's JSON serializer stores every constructor argument as plain data
-# under ``simsopt_objs``, so we can recover the option dicts with a plain
-# ``json.load`` -- no need to instantiate the (GPU-heavy) FEM objects just to
-# read their settings.
-_JSTRESS_PATH = _REPO_ROOT / 'beams-consistency' / 'Jstress.json'
-with open(_JSTRESS_PATH) as _f:
-    _jstress_objs = json.load(_f)['simsopt_objs']
+import opt_utils
+from opt_utils import load_eq
 
-_fem_obj_spec = _jstress_objs['CoilFEMObjective1']
-_support_spec = _jstress_objs['CoilSupportBeams1']
+# Match beams-consistency resolution (~110 quadpoints/coil) instead of the
+# shared default of 80. Looked up dynamically by ppp_for_target_quadpoints /
+# increase_base_curve_order inside fixed-continuation's run_continuation.
+opt_utils.TARGET_QUADPOINTS_PER_COIL = 110
 
-# Mesh / material / gravity / solver / physics options forwarded to
-# CoilFEMObjective -- identical to Jstress.json (canonical snapshot from
-# beams-consistency/mesh.ipynb). Clamp/attachment Winkler moduli live on
-# the Support (via beam_options / fixed_clamp_options), not in problem_options.
-mesh_options     = _fem_obj_spec['mesh_options']
-material_options = _fem_obj_spec['material_options']
-gravity_options  = _fem_obj_spec['gravity_options']
-problem_options  = dict(_fem_obj_spec['problem_options'])
-physics_options  = _fem_obj_spec['physics_options']
-coupling         = _fem_obj_spec['coupling']
+_OPTIONS_PATH = _REPO_ROOT / 'beam-options.json'
+opts = json.load(open(_OPTIONS_PATH))
 
-# CoilSupportBeams kwargs reproducing the exact beam network + fixed clamps
-# used in Jstress.json (n_beam_cc=4, n_beam_cf=0, r_beam=0.06 fixed,
-# thetas_orientation_cc fixed, fixed clamps enabled).
-# ``beam_options['k_attachment']`` and ``fixed_clamp_options['k_clamp']``
-# are the attachment / clamp moduli [N/m³] from the consistency case.
+mesh_options = opts['mesh_options']
+material_options = opts['material_options']
+gravity_options = opts['gravity_options']
+problem_options = dict(opts['problem_options'])
+physics_options = opts['physics_options']
+coupling = opts['coupling']
+
 beam_support_kwargs = dict(
-    beam_options        = dict(_support_spec['beam_options']),
-    fixed_clamp_options = dict(_support_spec['fixed_clamp_options']),
-    fixed_dof_names     = tuple(_support_spec['fixed_dof_names']),
-    r_beam              = _support_spec['r_beam'],
+    beam_options=dict(opts['beam_options']),
+    fixed_clamp_options=dict(opts['fixed_clamp_options']),
+    fixed_dof_names=tuple(opts['fixed_dof_names']),
+    r_beam=opts['r_beam'],
 )
 
 # ── Import fixed-continuation/optimization.py's reusable machinery ──────────
 # Loaded under a distinct module name (instead of a plain ``import
 # optimization``) so it can't collide with *this* module -- the two
 # beams-optimization scripts import this file itself as "optimization".
-# Executing it runs its own module-level setup once (load_eq, get_data,
-# target constants), exactly as when fixed-continuation's own scripts import
-# it directly; it resolves its own wout.nc relative to its own file, so this
-# works regardless of the caller's current working directory.
 _FC_PATH = _REPO_ROOT / 'fixed-continuation' / 'optimization.py'
 _fc_spec = importlib.util.spec_from_file_location(
     '_fixed_continuation_optimization', _FC_PATH,
@@ -67,24 +57,12 @@ _fc = importlib.util.module_from_spec(_fc_spec)
 sys.modules[_fc_spec.name] = _fc
 _fc_spec.loader.exec_module(_fc)
 
-# Match beams-consistency/Jstress.json's resolution (order=10, ppp=16 -> 160
-# quadpoints/coil) instead of fixed-continuation's own default of 80.
-# ``ppp_for_target_quadpoints``/``increase_base_curve_order`` in the imported
-# module look this global up dynamically (not captured at import time), so
-# overriding it here takes effect immediately for every call below.
-_fc.TARGET_QUADPOINTS_PER_COIL = 110 # 160
-
-# Re-exported unchanged.
-load_eq = _fc.load_eq
-ppp_for_target_quadpoints = _fc.ppp_for_target_quadpoints
-increase_base_curve_order = _fc.increase_base_curve_order
 coil_per_half_fp = _fc.coil_per_half_fp
 
 
 def run_filament_free(*args, **kwargs):
     """``fixed-continuation``'s ``run_filament_free``, defaulting its FEM
-    options to the beams (``CoilSupportBeams``) values read from
-    ``Jstress.json`` above."""
+    options to the beams values from ``beam-options.json``."""
     kwargs.setdefault('mesh_options', mesh_options)
     kwargs.setdefault('material_options', material_options)
     kwargs.setdefault('gravity_options', gravity_options)
@@ -96,8 +74,7 @@ def run_filament_free(*args, **kwargs):
 
 def run_continuation(*args, **kwargs):
     """``fixed-continuation``'s ``run_continuation``, defaulting its FEM
-    options to the beams (``CoilSupportBeams``) values read from
-    ``Jstress.json`` above."""
+    options to the beams values from ``beam-options.json``."""
     kwargs.setdefault('mesh_options', mesh_options)
     kwargs.setdefault('material_options', material_options)
     kwargs.setdefault('gravity_options', gravity_options)

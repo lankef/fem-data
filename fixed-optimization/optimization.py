@@ -1,4 +1,5 @@
 import json
+import sys
 import numpy as np
 import jax.numpy as jnp
 import time
@@ -7,127 +8,43 @@ from scipy.optimize import minimize
 from simsopt.objectives import SquaredFlux
 from simsopt.objectives.utilities import QuadraticPenalty
 from simsopt.field import (
-    BiotSavart, Current, Coil,
+    BiotSavart, Coil,
     coils_via_symmetries,
 )
 from simsopt.field.force import LpCurveForce
 from simsopt.field.coil import RegularizedCoil
 from simsopt.field.selffield import regularization_rect
-from simsopt import load, save
-from simsopt.mhd import Vmec
-from simsopt.mhd.virtual_casing import VirtualCasing
 from simsopt.geo import (
-    plot, CurveXYZFourier,
     CurveLength, CurveCurveDistance,
     SurfaceRZFourier,
     CurveSurfaceDistance,
     LinkingNumber,
-    create_equally_spaced_curves,
-    curves_to_vtk,
     LpCurveCurvature
 )
 from simsopt.configs import get_data
-from simsopt.geo import plot
 from coil_fem.simsopt            import CoilFEMObjective
-from coil_fem.simsopt            import CoilSupportFixed, CoilSupportTopBottom
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from opt_utils import load_eq
 
 # ----- FEM options -----
 
-# Rectangular 100 mm × 50 mm cross-section (half-widths in metres).
-# A single dict is broadcast to all base coils automatically.
-mesh_options = dict(
-    shape        = 'rect',
-    w1           = 0.2,   # 0.20 m half-width
-    w2           = 0.2,   # 0.20 m half-width
-    frame        = 'rmf',
-    aspect_ratio = 1.0,   # aim for cubic elements
-    mesh_type    = 'TET10',
-)
+_OPTIONS_PATH = _ROOT / 'beam-options.json'
+opts = json.load(open(_OPTIONS_PATH))
 
-# Winkler BC and linear-solver settings.
-problem_options = dict(
-    winkler_k      = 1e10,    # Winkler spring stiffness [N/m³]
-    solver         = 'cudss', # A CPU sparse solver. Future version 
-    adjoint_solver = 'cudss', # will support cuSparse GPU sparse solvers.
-)
+mesh_options = opts['mesh_options']
+# Fixed-family override: thermal contraction + real gravity (beams preset has 0).
+material_options = {**opts['material_options'], 'itc': 0.0029}
+gravity_options = {'g_vec': [0.0, 0.0, -9.80665]}
+problem_options = opts['problem_options']
+physics_options = opts['physics_options']
+fixed_clamp_options = opts['fixed_clamp_options']
 
-# Material settings
-# ─────────────────────────────────────────────────────────────────────────────
-# Material, thermal-contraction and gravity parameters are centralised in
-# ``fem-data/properties.json`` (repo root) and loaded here so every script uses
-# the same values + literature references.  W7-X coil casings / support
-# structure are AISI 316LN austenitic stainless steel; values (E, nu, density,
-# 293→4 K integral thermal contraction) are from Foussat et al. 2013 (see
-# properties.json).
-# To disable thermal or gravity, edit properties.json (set gravity.enabled=false
-# or drop the itc key); no code changes needed.
-# ─────────────────────────────────────────────────────────────────────────────
-_PROPERTIES_PATH = Path(__file__).resolve().parent.parent / 'properties.json'
-with open(_PROPERTIES_PATH) as _f:
-    _PROPERTIES = json.load(_f)
-
-_mat = _PROPERTIES['material']
-_grav = _PROPERTIES.get('gravity', {})
-
-# Elastic + thermal material options forwarded to CoilFEMObjective.
-material_options = dict(
-    E       = float(_mat['E_Pa']),
-    nu      = float(_mat['nu']),
-    density = float(_mat['density_kg_m3']),
-    itc     = float(_mat['itc']),   # integral thermal contraction ΔL/L; eps_th = -itc·I
-)
-
-# Gravity body-force options (None disables the gravity load).
-if _grav.get('enabled', False):
-    gravity_options = dict(
-        density = float(_mat['density_kg_m3']),
-        g_vec   = tuple(float(c) for c in _grav['g_vec_m_s2']),
-    )
-else:
-    gravity_options = None
-
-# Backward-compatible aliases: existing notebooks import these names.  Both now
-# point at the single JSON-sourced dict (thermal itc included).
+# Backward-compatible aliases: existing notebooks import these names.
 material_options_const_temp = material_options
 material_options_variable_temp = material_options
-
-# Load curves from lists of arrays containing x, y, and z.
-def simsopt_curves_from_xyz(
-    contour_X,
-    contour_Y,
-    contour_Z, 
-    order=None, ppp=20):
-    num_coils = len(contour_X)
-    try:     
-        from simsopt.geo import CurveXYZFourier
-    except:
-        raise ImportError('Simsopt is required to use the coil-cutting features.')
-    # Calculating order
-    if not order:
-        order=float('inf')
-        for i in range(num_coils):
-            xArr = contour_X[i]
-            yArr = contour_Y[i]
-            zArr = contour_Z[i]
-            for x in [xArr, yArr, zArr]:
-                if len(x)//2<order:
-                    order = len(x)//2
-    
-    coils = [CurveXYZFourier(order*ppp, order) for i in range(num_coils)]
-    # Compute the Fourier coefficients for each coil
-    for ic in range(num_coils):
-        xArr = contour_X[ic]
-        yArr = contour_Y[ic]
-        zArr = contour_Z[ic]
-
-        # Compute the Fourier coefficients
-        dofs=[]
-        for x in [xArr, yArr, zArr]:
-            dof_i = ifft_simsopt(x, order)
-            dofs.append(dof_i)
-
-        coils[ic].local_x = np.concatenate(dofs)
-    return coils
 
 # ----- Loading coils -----
 
@@ -137,35 +54,8 @@ curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_peri
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
-# ----- Loading equilibrium -----
-
-n_phi = 25        # half fp like in virtual casing convention
-n_theta = 50
-vc_src_nphi = 40  # half fp like in virtual casing convention
-vc_src_ntheta = 80
-
-def load_eq(file_name):
-    eq = Vmec(file_name, keep_all_files=True)
-    vc = VirtualCasing.from_vmec(
-        file_name,
-        src_nphi=vc_src_nphi,
-        src_ntheta=vc_src_ntheta,
-        trgt_nphi=n_phi,
-        trgt_ntheta=n_theta,
-    )
-    # This is a vacuum case!
-    Bnormal_plasma = jnp.zeros_like(vc.B_external_normal)
-    plasma_surface_vc = type(eq.boundary)(
-        nfp=eq.boundary.nfp,
-        stellsym=eq.boundary.stellsym,
-        mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
-        quadpoints_phi=np.linspace(0, 1/2/eq.boundary.nfp, n_phi, endpoint=False),
-        quadpoints_theta=np.linspace(0, 1, n_theta, endpoint=False),
-    )
-    plasma_surface_vc.set_dofs(eq.boundary.get_dofs())
-    return eq, Bnormal_plasma, plasma_surface_vc, vc
-
-eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq('wout.nc')
+_WOUT_PATH = Path(__file__).resolve().parent / 'wout.nc'
+eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq(str(_WOUT_PATH))
 
 # ----- Loading constant parameters -----
 # Setting targets
@@ -206,24 +96,6 @@ MAXITER = 5
 STRESS_WEIGHT = 1e-18
 
 
-def increase_base_curve_order(base_curves, coils_per_half_field_period, increment):
-    order_in = base_curves[0].order
-    contour_X = []
-    contour_Y = []
-    contour_Z = []
-    for curve_i in base_curves:
-        gamma_i = curve_i.gamma()
-        contour_X.append(gamma_i[:, 0])
-        contour_Y.append(gamma_i[:, 1])
-        contour_Z.append(gamma_i[:, 2])
-    base_curves_out = simsopt_curves_from_xyz(
-        contour_X,
-        contour_Y,
-        contour_Z,
-        order=order_in + increment,
-        ppp=20,
-    )
-    return base_curves_out
 def run_filament_free(
         base_curves, base_currents, 
         plasma_surface, Bnormal_plasma, 
