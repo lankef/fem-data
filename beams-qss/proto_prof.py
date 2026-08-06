@@ -151,7 +151,6 @@ dofs = Jstress.x
 jax.block_until_ready(fun(dofs)[1])
 print('MAXITER =', MAXITER)
 print('# free dofs =', len(dofs))
-print('# linear inequality constraints =', constraints[0].A.shape[0])
 with nvtx.annotate("capture", color="yellow"):
     for _ in range(2):
         x = dofs + 1e-6*np.random.randn(*dofs.shape)
