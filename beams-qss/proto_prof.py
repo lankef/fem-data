@@ -4,8 +4,13 @@
 # not too bad, then we can handle support like an optimization
 # subproblem, because handling support and coils together
 # can cause coils to converge prematurely. 
+#
+# Constrained variant: CoilSupportBeamsSorted + scipy trust-constr
+# with box bounds from Jstress.bounds and linear inequalities
+# sum_j dphis*[i][j] <= 1 per coil/group for dphis, dphis_start_cc,
+# and dphis_end_cc.
 
-from coil_fem.simsopt import CoilSupportBeams
+from coil_fem.simsopt import CoilSupportBeamsSorted
 from coil_fem.simsopt import CoilFEMObjective
 import gmsh
 from simsopt.configs import get_data
@@ -15,9 +20,11 @@ import json
 import numpy as np
 import jax
 import time
+from collections import defaultdict
 from pathlib import Path
 from simsopt.field import Coil
-from scipy.optimize import minimize
+from scipy.optimize import minimize, Bounds, LinearConstraint
+import nvtx
 
 # Loading the W7-X standard configuration 
 # plasma surface. wout file comes from Landreman's
@@ -27,8 +34,8 @@ eq = Vmec('../fixed-continuation/wout.nc', keep_all_files=True)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
-MAXITER = 50
-MAXFUN = 500
+MAXITER = 10
+MAXFUN = 100
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -45,7 +52,7 @@ coil_per_half_fp = 5
 # to make the aspect ratio close to one. Please see 
 # the next sections for details.  
 curves, currents, axis, nfp, bs = get_data(
-    'w7x', coil_order=10, points_per_period=8
+    'w7x', coil_order=8, points_per_period=8
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -67,7 +74,7 @@ mesh_scale = 0.5
 
 # One support object covers the whole base coilset
 base_coils = [Coil(c, I) for c, I in zip(base_curves, base_currents)]
-coil_support = CoilSupportBeams(
+coil_support = CoilSupportBeamsSorted(
     base_coils=base_coils,
     nfp=eq.boundary.nfp,
     stellsym=eq.boundary.stellsym,
@@ -99,7 +106,7 @@ Jstress.save_support_vtu('supports_init')
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
-# CoilSupportBeams dofs (the beam network) are optimized.
+# CoilSupportBeamsSorted dofs (the beam network) are optimized.
 for c in base_curves:
     c.fix_all()
 for cur in base_currents:
@@ -111,23 +118,42 @@ def fun(dofs):
     grad = Jstress.dJ()
     return J, grad
 
-# Profiling
-with jax.profiler.trace("./tmp/jax-trace", create_perfetto_link=False):
 
-    dofs = Jstress.x
-    print('MAXITER =', MAXITER)
-    time_filament_1 = time.time()
-    res = minimize(
-        fun, dofs, jac=True, method='L-BFGS-B',
-        options={
-            'maxiter': MAXITER,
-            'maxcor': 300,
-            'maxfun': MAXFUN,
-            'maxls': 60,
-        },
-        tol=1e-10,
-    )
-    save([Jstress], 'Jstress_fin.json')
-    time_filament_2 = time.time()
-    print('time', time_filament_2 - time_filament_1)
-    print('res ', res)
+def _sum_dphis_constraint(dof_names):
+    """Linear inequalities sum_j dphis*[i][j] <= 1 for each coil/group.
+
+    Applies to free DOFs named ``dphis``, ``dphis_start_cc``, and
+    ``dphis_end_cc`` (simsopt names like ``...:dphis_start_cc(i,j)``).
+    """
+    keys = ('dphis', 'dphis_start_cc', 'dphis_end_cc')
+    groups = defaultdict(list)
+    for j, name in enumerate(dof_names):
+        # simsopt: "CoilSupportBeamsSorted1:dphis_start_cc(0,3)"
+        local = name.split(':', 1)[-1]
+        key = local.split('(', 1)[0]
+        if key not in keys:
+            continue
+        i_coil = int(local.split('(', 1)[1].split(',', 1)[0])
+        groups[(key, i_coil)].append(j)
+    n = len(dof_names)
+    if not groups:
+        return LinearConstraint(np.zeros((0, n)), -np.inf, np.zeros(0))
+    A = np.zeros((len(groups), n))
+    for row, idxs in enumerate(groups.values()):
+        A[row, idxs] = 1.0
+    return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
+
+
+# # Profiling
+# with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
+
+dofs = Jstress.x
+jax.block_until_ready(fun(dofs)[1])
+print('MAXITER =', MAXITER)
+print('# free dofs =', len(dofs))
+print('# linear inequality constraints =', constraints[0].A.shape[0])
+with nvtx.annotate("capture", color="yellow"):
+    for _ in range(2):
+        x = dofs + 1e-6*np.random.randn(*dofs.shape)
+        jax.block_until_ready(fun(x)[1])
+
