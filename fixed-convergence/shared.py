@@ -26,58 +26,18 @@ from coil_fem import CoilFEM
 from coil_fem.coupling import Support
 
 # ── Physics / solver options ──────────────────────────────────────────────────
-# Rectangular cross-section (full-widths in metres).
-mesh_options = dict(
-    shape        = 'rect',
-    w1           = 0.2,   # 0.20 m full-width
-    w2           = 0.2,   # 0.20 m full-width
-    frame        = 'rmf',
-    aspect_ratio = 1.0,   # aim for cubic elements
-    mesh_type    = 'TET10',
-)
+_OPTIONS_PATH = Path(__file__).resolve().parent.parent / 'beam-options.json'
+opts = json.load(open(_OPTIONS_PATH))
 
-# Linear-solver settings. Winkler modulus lives on Support (k_clamp), not here.
-problem_options = dict(
-    # solver         = 'jax',     # JAX solver. (GPU). Default solver is UMFPack (CPU)
-    # adjoint_solver = 'jax',
-)
-
-# Grounded Winkler spring stiffness [N/m³] for the top/bottom soft clamps.
-k_clamp = 1e10
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Material, thermal-contraction and gravity parameters are centralised in
-# ``fem-data/properties.json`` (repo root) and loaded here so every script uses
-# the same values + literature references.  W7-X coil casings / support
-# structure are AISI 316LN austenitic stainless steel; values (E, nu, density,
-# 293→4 K integral thermal contraction) are from Foussat et al. 2013 (see
-# properties.json).
-# To disable thermal or gravity, edit properties.json (set gravity.enabled=false
-# or drop the itc key); no code changes needed.
-# ─────────────────────────────────────────────────────────────────────────────
-_PROPERTIES_PATH = Path(__file__).resolve().parent.parent / 'properties.json'
-with open(_PROPERTIES_PATH) as _f:
-    _PROPERTIES = json.load(_f)
-
-_mat = _PROPERTIES['material']
-_grav = _PROPERTIES.get('gravity', {})
-
-# Elastic + thermal material options forwarded to CoilFEM.
-material_options = dict(
-    E       = float(_mat['E_Pa']),
-    nu      = float(_mat['nu']),
-    density = float(_mat['density_kg_m3']),
-    itc     = float(_mat['itc']),   # integral thermal contraction ΔL/L; eps_th = -itc·I
-)
-
-# Gravity body-force options (None disables the gravity load).
-# Density always comes from material_options; only g_vec is read here.
-if _grav.get('enabled', False):
-    gravity_options = dict(
-        g_vec = tuple(float(c) for c in _grav['g_vec_m_s2']),
-    )
-else:
-    gravity_options = None
+mesh_options = opts['mesh_options']
+# Fixed-family overrides vs beams preset (itc=0, zero g, E_coil clamps).
+material_options = {**opts['material_options'], 'itc': 0.0029}
+gravity_options = {'g_vec': [0.0, 0.0, -9.80665]}
+physics_options = opts['physics_options']
+fixed_clamp_options = {**opts['fixed_clamp_options'], 'k_clamp': 1e10}
+k_clamp = fixed_clamp_options['k_clamp']
+# Bench scripts pick the solver per run; leave the shared default empty.
+problem_options = {}
 
 # ── Support-function geometry ─────────────────────────────────────────────────
 # Soft-sphere clamps at the coil top/bottom (same geometry as CoilSupportTopBottom).

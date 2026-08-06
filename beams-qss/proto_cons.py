@@ -16,10 +16,12 @@ import gmsh
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
 from simsopt import save
+import json
 import numpy as np
 import jax
 import time
 from collections import defaultdict
+from pathlib import Path
 from simsopt.field import Coil
 from scipy.optimize import minimize, Bounds, LinearConstraint
 
@@ -54,71 +56,18 @@ curves, currents, axis, nfp, bs = get_data(
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
-# ----- Loading material properties -----
+# ----- FEM / support options -----
 
-# Rectangular 100 mm × 50 mm cross-section (half-widths in metres).
-# This single dict will be broadcast to all base coils automatically.
-# The mesh density is controlled by the quadpoint number in base_curve.
-mesh_options = {
-    'shape'       : 'rect',  # Rectangular cross sections
-    'w1'          : 0.2,     # 0.20 m full-width
-    'w2'          : 0.2,     # 0.20 m full-width
-    'frame'       : 'rmf',   # Cross sections oriented to a rotation-minimizing frame
-    'aspect_ratio': 1.0,     # Aim for cubic elements
-    'mesh_type'   : 'TET10', # Quadratic tetrahedral mesh and elements.
-}
-
-# Problem and solver options.
-problem_options = {
-    'solver'         : 'cudss', # A GPU direct sparse solver. Strongly 
-    'adjoint_solver' : 'cudss', # recommended.
-}
-
-# Material options. Here, we assumes the coils are composed
-# uniformly of 316LN stainless steel. Material properties cited 
-# from DOI: 10.1016/j.nucengdes.2013.08.016
-material_options = {
-    'E'      : 205000000000, # Young's modulus (Pa)
-    'nu'     : 0.3,          # Poisson's ratio (dimless)
-    'density': 8000,         # Density (kg/m³)
-    'itc'    : 0.0,          # Integral thermal contraction (ΔL/L, dimless)
-                             # Was 0.0029, turned off because it's not supported 
-                             # yet in beam network
-}
-
-# Gravity options.
-# This is a stellarator-symmetric case.
-# For now gravity won't be correct.
-gravity_options = {
-    'g_vec': (0, 0, 0), # g vector in (x, y, z)   (m/s²)
-}
-# Meshing scale in msh and dolfinx validation case
+_OPTIONS_PATH = Path(__file__).resolve().parent.parent / 'beam-options.json'
+opts = json.load(open(_OPTIONS_PATH))
+mesh_options = opts['mesh_options']
+material_options = opts['material_options']
+gravity_options = opts['gravity_options']
+problem_options = opts['problem_options']
+physics_options = opts['physics_options']
+beam_options = opts['beam_options']
+fixed_clamp_options = opts['fixed_clamp_options']
 mesh_scale = 0.5
-
-# ----- Support options ----- 
-
-beam_options = {
-    'n_beam_cc': 4,     # 3 coil-coil beams
-    'n_beam_cf': 0,     # No coil-foundation beams for simplicity
-    'E': material_options['E'],  # 316LN's Young's modulus (Pa)
-    'nu': material_options['nu'],          # 316LN's Poisson's ratio (dimless)
-    'cross_section_type': 'solid_circle',
-    'attachment_type': 'direct',
-    # k_clamp will be calculated automatically from the beams' stiffness 
-    # based on their lengths and Young's modulus
-}
-# Fixed clamps have to be enabled when there are no CF beamsto prevent rigid body modes
-fixed_clamp_options = {
-    'enabled': True, 
-    'r_clamp': 1.73 * mesh_options['w1']/2, # Diagonal of a cube with side length of w_1
-    'n_clamp': 2,
-    # k_clamp will be calculated automatically from the coil's stiffness 
-    # based on their lengths and Young's modulus
-    'E_coil': material_options['E'],  
-}
-physics_options = {
-    'type': 'elastic',
-}
 
 # ----- Defining optimizable ----- 
 
@@ -128,32 +77,10 @@ coil_support = CoilSupportBeamsSorted(
     base_coils=base_coils,
     nfp=eq.boundary.nfp,
     stellsym=eq.boundary.stellsym,
-    # ----- Beam info -----
     beam_options=beam_options,
-    # dphis_start_cc # Default values.
-    # dphis_end_cc # Default values.
-    # dphis_start_cf # Default values.
-    # x_foundation # Default values, no cf beams
-    # thetas_orientation_cc # Default values. Circular cross sections.
-    # thetas_orientation_cf # Default values.
-    r_beam=0.06, # When using circular beams, the cross sec rad is a dof
-                # and must be supplied as a kwarg. We fix it in this optimization.
-    # ----- Fixed clamp info -----
+    r_beam=opts['r_beam'],
     fixed_clamp_options=fixed_clamp_options,
-    # ----- Simsopt info -----
-    # Fixing beam network dofs. Some of these
-    # will result in ill-posed problems if not fixed.
-    # If a certain type of beam has n=0, then the 
-    # associated dofs will be automatically fixed.
-    fixed_dof_names=(
-        # 'dphis_end_cc',
-        # 'dphis_start_cc',
-        # 'dphis_start_cf',
-        'thetas_orientation_cc',
-        # 'thetas_orientation_cf',
-        # 'x_foundation',
-        'r_beam',
-    ),
+    fixed_dof_names=tuple(opts['fixed_dof_names']),
 )
 
 # The Simsopt wrapper for a differentiable FEM problem.
@@ -167,7 +94,7 @@ Jstress = CoilFEMObjective(
     gravity_options  = gravity_options,
     problem_options  = problem_options,
     physics_options  = physics_options,
-    coupling         = 'monolithic',
+    coupling         = opts['coupling'],
 )
 save([Jstress], 'Jstress_init.json')
 print('# mesh node for all coils:', Jstress.n_nodes)

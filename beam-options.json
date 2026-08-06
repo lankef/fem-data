@@ -1,0 +1,46 @@
+{
+  "mesh_options": {
+    "shape": "rect",
+    "w1": 0.2,
+    "w2": 0.2,
+    "frame": "rmf",
+    "aspect_ratio": 1.0,
+    "mesh_type": "TET10"
+  },
+  "material_options": {
+    "E": 205000000000.0,
+    "nu": 0.3,
+    "density": 8000.0,
+    "itc": 0.0
+  },
+  "gravity_options": {
+    "g_vec": [0.0, 0.0, 0.0]
+  },
+  "problem_options": {
+    "solver": "cudss",
+    "adjoint_solver": "cudss"
+  },
+  "physics_options": {
+    "type": "elastic"
+  },
+  "beam_options": {
+    "n_beam_cc": 4,
+    "n_beam_cf": 0,
+    "E": 205000000000.0,
+    "nu": 0.3,
+    "cross_section_type": "solid_circle",
+    "attachment_type": "direct"
+  },
+  "fixed_clamp_options": {
+    "enabled": true,
+    "r_clamp": 0.173,
+    "n_clamp": 2,
+    "E_coil": 205000000000.0
+  },
+  "coupling": "monolithic",
+  "r_beam": 0.06,
+  "fixed_dof_names": [
+    "thetas_orientation_cc",
+    "r_beam"
+  ]
+}

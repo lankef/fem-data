@@ -6,7 +6,6 @@ from optimization import (
 
 # Loading config from simsopt
 from simsopt.configs import get_data
-from simsopt.geo import plot
 from coil_fem.simsopt import CoilSupportBeams
 from simsopt import save
 import time

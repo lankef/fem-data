@@ -1,12 +1,8 @@
 import json
 import sys
 import numpy as np
-import jax.numpy as jnp
-import time
 from pathlib import Path
-from scipy.optimize import minimize
 from simsopt.objectives import SquaredFlux
-from simsopt.objectives.utilities import QuadraticPenalty
 from simsopt.field import (
     BiotSavart, Coil,
     coils_via_symmetries,
@@ -55,11 +51,11 @@ curves, currents, axis, nfp, bs = get_data('w7x', coil_order=20, points_per_peri
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
-# Resolved relative to this file (not the caller's CWD) so this module can be
-# imported from other project directories (e.g. beams-optimization/) as well
-# as run from within fixed-continuation/ itself.
-_WOUT_PATH = str(Path(__file__).resolve().parent / 'wout.nc')
-eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq(_WOUT_PATH)
+# Prefer local wout if present; else fall back to fixed-continuation's.
+_WOUT_PATH = Path(__file__).resolve().parent / 'wout.nc'
+if not _WOUT_PATH.is_file():
+    _WOUT_PATH = _ROOT / 'fixed-continuation' / 'wout.nc'
+eq, Bnormal_plasma, plasma_surface_vc, vc = load_eq(str(_WOUT_PATH))
 
 # ----- Loading constant parameters -----
 # Setting targets
@@ -87,16 +83,7 @@ CURVATURE_TARGET = np.max([c.kappa() for c in base_curves])
 # ---- Optimization parameters ----
 # To be increased for actual scan
 MAXFUN = 1e7
-CURVATURE_WEIGHT = 1000
-FLUX_WEIGHT = 500000
-FORCE_WEIGHT = 5/1e5
-LINK_WEIGHT = 10
 Lp = 2  # p of Lp curve curvature
-CC_WEIGHT = 10000
-CS_WEIGHT = 10000
-LENGTH_WEIGHT = 200
-MAXITER = 5
-STRESS_WEIGHT = 1e-18
 
 # ---- Fourier continuation parameters ----
 # Start from circular coils and progressively increase the Fourier order of the
@@ -106,7 +93,6 @@ INIT_ORDER = 4          # Fourier order of the initial circular coils
 ORDER_INCREMENT = 2     # order added to the base curves each continuation step
 CONT_STEPS = 3          # number of continuation steps
 CIRCLE_RADIUS_FACTOR = 3  # circular coil radius R1 = factor * plasma minor radius
-
 
 def run_filament_free(
         base_curves, base_currents, 
@@ -139,6 +125,8 @@ def run_filament_free(
 
     curves_for_ccd = [c.curve for c in coils]
 
+    # ----- Field error ------
+
     bs = BiotSavart(coils)
     print('Btarget should have shape', plasma_surface.normal().shape[:2])
     print('Btarget has shape', Bnormal_plasma.shape)
@@ -149,29 +137,19 @@ def run_filament_free(
         target=Bnormal_plasma,
         definition='normalized',
     )
-    Jf_actual = SquaredFlux(
-        plasma_surface,
-        bs,
-        target=Bnormal_plasma,
-        definition='quadratic flux',
-    )
-    print('Initial normalized flux', Jf_norm.J())
-    Jf_norm_cons = QuadraticPenalty(Jf_norm, FLUX_NORM_TARGET, 'max')
-    Jls = [
-        QuadraticPenalty(
-            CurveLength(c),
-            CurveLength(c).J(),
-            "max", 
-        ) for c in base_curves
-    ]
-    print('Initial lengths', [CurveLength(c).J() for c in base_curves])
-    print('Setting length targets to these values.')
+
+    # ----- Curve lengths -----
+
+    len_init = [CurveLength(c).J() for c in base_curves]
+    print('Initial lengths', len_init, 'setting length targets to these values.')
+
+    # ----- Force/stress ----- 
 
     if force_mode:
         regularized_coils = [RegularizedCoil(
             c.curve, c.current, regularization_rect(0.54, 0.54)
         ) for c in coils]
-        Jforce = LpCurveForce(
+        Jopt = LpCurveForce(
             target_coils=regularized_coils[:coil_per_half_fp],
             source_coils_coarse=regularized_coils,
         )
@@ -196,11 +174,15 @@ def run_filament_free(
             _fem_kwargs['physics_options'] = physics_options
         if coupling is not None:
             _fem_kwargs['coupling'] = coupling
-        Jstress = CoilFEMObjective(coil_support, **_fem_kwargs)
+        Jopt = CoilFEMObjective(coil_support, **_fem_kwargs)
         print('Optimizing max Von Mises')
+    
+    # ----- Curve-curve distance ----- 
+
     Jccdist_actual = CurveCurveDistance(curves_for_ccd, CC_TARGET)
-    Jccdist = Jccdist_actual * (1 / CC_TARGET)
-    print('Begin ----------')
+
+    # ----- Curve-plasma distance ----- 
+
     plasma_surface_cs = SurfaceRZFourier(
         nfp=plasma_surface.nfp,
         stellsym=plasma_surface.stellsym,
@@ -212,86 +194,20 @@ def run_filament_free(
     plasma_surface_cs.set_dofs(plasma_surface.get_dofs())
     Jcsdist_actual = CurveSurfaceDistance(base_curves, plasma_surface_cs, CP_TARGET)
     Jcsdist = Jcsdist_actual * (1 / plasma_surface.minor_radius())
+
+    # ----- Linking number ----- 
+
     linkNum = LinkingNumber(curves_for_ccd)
+
+    # ----- Curvature ----- 
+
     Jcs = [
         LpCurveCurvature(
             c, Lp, threshold=CURVATURE_TARGET
         )*(plasma_surface.minor_radius()**Lp) for c in base_curves
     ]
-    JF = (
-        FLUX_WEIGHT ** 2 * Jf_norm_cons
-        + CC_WEIGHT * Jccdist
-        + CS_WEIGHT * Jcsdist
-        + CURVATURE_WEIGHT * sum(Jcs)
-        + LENGTH_WEIGHT * sum(Jls)
-        + LINK_WEIGHT * linkNum
-    )
-    if force_mode:
-        JF = JF + FORCE_WEIGHT * Jforce
-    else:
-        JF = JF + STRESS_WEIGHT * Jstress
-        
-    def fun(dofs):
-        JF.x = dofs
-        J = JF.J()
-        grad = JF.dJ()
-        return J, grad
-
-    dofs = JF.x
-
-    print('MAXITER =', MAXITER)
-    time_filament_1 = time.time()
-    res = minimize(
-        fun, dofs, jac=True, method='L-BFGS-B',
-        options={
-            'maxiter': MAXITER,
-            'maxcor': 300,
-            'maxfun': MAXFUN,
-            'maxls': 60,
-        },
-        tol=1e-10,
-    )
-    time_filament_2 = time.time()
-    filament_time = time_filament_2 - time_filament_1
-    print('Filament time', filament_time)
-    print('Normalized flux', Jf_norm.J())
-    if force_mode:
-        print('L2 force', Jforce.J())
-    else:
-        print('Max (lse) von mises', Jstress.J())
-    print('Lengths', [j.J() for j in Jls])
-    print('Max curvatures', [jnp.max(jnp.abs(c.kappa())) for c in base_curves])
-    print('Final value of terms')
-    print('    FLUX_WEIGHT**2 * Jf_norm_cons ', FLUX_WEIGHT**2 * Jf_norm_cons.J())
-    print('    + CC_WEIGHT * Jccdist         ', CC_WEIGHT * Jccdist.J())
-    print('    + CS_WEIGHT * Jcsdist         ', CS_WEIGHT * Jcsdist.J())
-    if force_mode:
-        print('    + FORCE_WEIGHT * Jforce       ', FORCE_WEIGHT * Jforce.J())
-    else:
-        print('    + STRESS_WEIGHT * Jstress     ', STRESS_WEIGHT * Jstress.J())
-    print('    + CURVATURE_WEIGHT * sum(Jcs) ', CURVATURE_WEIGHT * sum(Jcs).J())
-    print('    + LINK_WEIGHT * linkNum       ', LINK_WEIGHT * linkNum.J())
-    print('    + LENGTH_WEIGHT * sum(Jls)    ', (LENGTH_WEIGHT * sum(Jls)).J())
-    print('-----------------------------------------')
-    print('res', res)
-    if force_mode:
-        return (
-            coils, curves_for_ccd, res, filament_time,
-            Jf_norm, Jf_actual, 
-            Jccdist, Jccdist_actual,
-            Jcsdist, Jcsdist_actual,
-            Jforce,
-            Jls, linkNum,
-        )
-    else:
-        return (
-            coils, curves_for_ccd, res, filament_time,
-            Jf_norm, Jf_actual, 
-            Jccdist, Jccdist_actual,
-            Jcsdist, Jcsdist_actual,
-            Jstress,
-            Jls, linkNum,
-        )
+    
+    
 
 
 def run_continuation(

@@ -9,7 +9,9 @@ import gmsh  # noqa: F401
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
 from simsopt.field import Coil
+import json
 import numpy as np
+from pathlib import Path
 
 eps_list = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
 seed = 1
@@ -24,40 +26,15 @@ curves, currents, axis, nfp, bs = get_data(
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
-mesh_options = {
-    'shape': 'rect',
-    'w1': 0.2,
-    'w2': 0.2,
-    'frame': 'rmf',
-    'aspect_ratio': 1.0,
-    'mesh_type': 'TET10',
-}
-problem_options = {
-    'solver': 'cudss',
-    'adjoint_solver': 'cudss',
-}
-material_options = {
-    'E': 205000000000,
-    'nu': 0.3,
-    'density': 8000,
-    'itc': 0.0,
-}
-gravity_options = {'g_vec': (0, 0, 0)}
-beam_options = {
-    'n_beam_cc': 4,
-    'n_beam_cf': 0,
-    'E': material_options['E'],
-    'nu': material_options['nu'],
-    'cross_section_type': 'solid_circle',
-    'attachment_type': 'direct',
-}
-fixed_clamp_options = {
-    'enabled': True,
-    'r_clamp': 1.73 * mesh_options['w1'] / 2,
-    'n_clamp': 2,
-    'E_coil': material_options['E'],
-}
-physics_options = {'type': 'elastic'}
+_OPTIONS_PATH = Path(__file__).resolve().parent.parent / 'beam-options.json'
+opts = json.load(open(_OPTIONS_PATH))
+mesh_options = opts['mesh_options']
+material_options = opts['material_options']
+gravity_options = opts['gravity_options']
+problem_options = opts['problem_options']
+physics_options = opts['physics_options']
+beam_options = opts['beam_options']
+fixed_clamp_options = opts['fixed_clamp_options']
 
 base_coils = [Coil(c, I) for c, I in zip(base_curves, base_currents)]
 coil_support = CoilSupportBeamsSorted(
@@ -65,12 +42,9 @@ coil_support = CoilSupportBeamsSorted(
     nfp=eq.boundary.nfp,
     stellsym=eq.boundary.stellsym,
     beam_options=beam_options,
-    r_beam=0.06,
+    r_beam=opts['r_beam'],
     fixed_clamp_options=fixed_clamp_options,
-    fixed_dof_names=(
-        'thetas_orientation_cc',
-        'r_beam',
-    ),
+    fixed_dof_names=tuple(opts['fixed_dof_names']),
 )
 Jstress = CoilFEMObjective(
     coil_support,
@@ -81,7 +55,7 @@ Jstress = CoilFEMObjective(
     gravity_options=gravity_options,
     problem_options=problem_options,
     physics_options=physics_options,
-    coupling='monolithic',
+    coupling=opts['coupling'],
 )
 
 for c in base_curves:
