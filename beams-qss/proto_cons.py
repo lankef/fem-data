@@ -33,8 +33,8 @@ eq = Vmec('../fixed-continuation/wout.nc', keep_all_files=True)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
-MAXITER = 50
-MAXFUN = 500
+MAXITER = 1000
+MAXFUN = 10000
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -51,7 +51,7 @@ coil_per_half_fp = 5
 # to make the aspect ratio close to one. Please see 
 # the next sections for details.  
 curves, currents, axis, nfp, bs = get_data(
-    'w7x', coil_order=8, points_per_period=8
+    'w7x', coil_order=8, points_per_period=12
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -168,5 +168,6 @@ res = minimize(
 )
 save([Jstress], 'Jstress_fin.json')
 time_filament_2 = time.time()
+Jstress.save_run_vtu('fin_run')
 print('time', time_filament_2 - time_filament_1)
 print('res ', res)
