@@ -24,7 +24,9 @@ from collections import defaultdict
 from pathlib import Path
 from simsopt.field import Coil
 from scipy.optimize import minimize, Bounds, LinearConstraint
+# Profiling 
 import nvtx
+import jax.profiler
 
 # Loading the W7-X standard configuration 
 # plasma surface. wout file comes from Landreman's
@@ -34,8 +36,7 @@ eq = Vmec('../fixed-continuation/wout.nc', keep_all_files=True)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
-MAXITER = 10
-MAXFUN = 100
+
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -52,7 +53,7 @@ coil_per_half_fp = 5
 # to make the aspect ratio close to one. Please see 
 # the next sections for details.  
 curves, currents, axis, nfp, bs = get_data(
-    'w7x', coil_order=8, points_per_period=8
+    'w7x', coil_order=8, points_per_period=12
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -148,11 +149,29 @@ def _sum_dphis_constraint(dof_names):
 # with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
 
 dofs = Jstress.x
-jax.block_until_ready(fun(dofs)[1])
-print('MAXITER =', MAXITER)
-print('# free dofs =', len(dofs))
-with nvtx.annotate("capture", color="yellow"):
-    for _ in range(2):
-        x = dofs + 1e-6*np.random.randn(*dofs.shape)
-        jax.block_until_ready(fun(x)[1])
+# The master block that Nsight will use to start/stop recording
+with nvtx.annotate("capture", color="blue"): 
+    
+    # Sub-region 1
+    with nvtx.annotate("compile", color="red"):
+        final_grad1 = jax.block_until_ready(fun(dofs)[1])
+        
+    print('# free dofs =', len(dofs))
+
+    # Sub-region 2
+    with nvtx.annotate("run", color="yellow"):
+        for _ in range(2):
+            noise = 1e-6 * np.random.randn(*dofs.shape).astype(dofs.dtype)
+            x = dofs + noise
+            final_grad = jax.block_until_ready(fun(x)[1])
+            
+# 2. Use an absolute path to ensure it saves to your submit directory, not TMPDIR
+output_path = str(Path(__file__).resolve().parent / "memory_profile.prof")
+
+# 3. Take the snapshot while 'final_grad' is still in memory
+jax.profiler.save_device_memory_profile(output_path)
+print(f"Memory profile successfully saved to: {output_path}")
+
+# 4. (Optional) Now you can safely delete the output if the script continues
+del final_grad
 
