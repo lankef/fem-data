@@ -10,11 +10,16 @@
 # sum_j dphis*[i][j] <= 1 per coil/group for dphis, dphis_start_cc,
 # and dphis_end_cc.
 
-from coil_fem.simsopt import CoilSupportBeamsSorted
-from coil_fem.simsopt import CoilFEMObjective
+from coil_fem.simsopt import (
+    CoilSupportBeamsSorted, 
+    BeamSurfaceDistance, 
+    CoilFEMObjective,
+    constraint_from_optimizable
+)
 import gmsh
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
+from simsopt.geo import CurveSurfaceDistance
 from simsopt import save
 import json
 import numpy as np
@@ -51,7 +56,7 @@ coil_per_half_fp = 5
 # to make the aspect ratio close to one. Please see 
 # the next sections for details.  
 curves, currents, axis, nfp, bs = get_data(
-    'w7x', coil_order=8, points_per_period=12
+    'w7x', coil_order=8, points_per_period=18
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -102,6 +107,11 @@ print('# mesh cell for all coils:', Jstress.n_cells)
 # Viusualizing the mesh nodes and support clamps before optimization
 Jstress.save_support_vtu('supports_init')
 
+# ----- Beam-surface distance -----
+# First, reading the coil plasma distance 
+min_csd = CurveSurfaceDistance(base_curves, plasma_surface, 0).shortest_distance()
+Jbsd = BeamSurfaceDistance(coil_support, plasma_surface, min_csd * 0.9)
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
@@ -149,7 +159,10 @@ def _sum_dphis_constraint(dof_names):
 dofs = Jstress.x
 lb, ub = Jstress.bounds
 bounds = Bounds(lb, ub)
-constraints = [_sum_dphis_constraint(Jstress.dof_names)]
+constraints = [
+    _sum_dphis_constraint(Jstress.dof_names),
+    constraint_from_optimizable(Jbsd, 0, 0)
+]
 print('MAXITER =', MAXITER)
 print('# free dofs =', len(dofs))
 print('# linear inequality constraints =', constraints[0].A.shape[0])
