@@ -3,9 +3,11 @@ This is the coil stress optimization dataset.
 
 ## List of files/folders
 - `coilforce`: The prototype for coil-fem that this dataset is produced with.
-- `w7x-convergence`: The benchmark runs in Section 3.1. To re-run, execute `submit.sh` and `submit_petsc.sh`.
-- `w7x-continuation`: The optimization runs in Section 3.2. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
-- `w7x-optimization`: The optimization runs in Section 3.2, using w7x coils as the initial conditions. Not included in the manuscript. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
+- `fixed-convergence`: The benchmark runs with fixed clamps. To re-run, execute `submit.sh` and `submit_petsc.sh`.
+- `fixed-continuation`: The optimization runs with fixed clamps. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
+- `fixed-optimization`: The optimization runs with fixed clamps, using w7x coils as the initial conditions. Not included in the manuscript. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
+- `beams-remat`: Demonstrating the effectiveness of rematerialization in the cuDSS backend.
+- `beams-profiling`: Seeing how big of a problem an L40s can fit.
 - `figures`: The figures.
 - `beam-options.json`: Hand-authored CoilFEM / CoilSupport option preset (API-key dict). Defaults are the beams / qss family (`itc=0`, zero gravity, beam network + clamps). Fixed-family scripts load the same file and override `itc` / `g_vec` locally.
 
