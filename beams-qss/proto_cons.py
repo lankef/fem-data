@@ -13,6 +13,7 @@
 from coil_fem.simsopt import (
     CoilSupportBeamsSorted, 
     BeamSurfaceDistance, 
+    BeamCurveAngle,
     CoilFEMObjective,
     constraint_from_optimizable
 )
@@ -56,7 +57,7 @@ coil_per_half_fp = 5
 # to make the aspect ratio close to one. Please see 
 # the next sections for details.  
 curves, currents, axis, nfp, bs = get_data(
-    'w7x', coil_order=8, points_per_period=18
+    'w7x', coil_order=8, points_per_period=24
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -112,6 +113,9 @@ Jstress.save_support_vtu('supports_init')
 min_csd = CurveSurfaceDistance(base_curves, plasma_surface, 0).shortest_distance()
 Jbsd = BeamSurfaceDistance(coil_support, plasma_surface, min_csd * 0.9)
 
+# ----- Beam-curve angle -----
+Jbca = BeamCurveAngle(coil_support, minimum_angle=np.pi/6, mode='all')
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
@@ -161,7 +165,8 @@ lb, ub = Jstress.bounds
 bounds = Bounds(lb, ub)
 constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
-    constraint_from_optimizable(Jbsd, 0, 0)
+    constraint_from_optimizable(Jbsd, 0, 0),
+    constraint_from_optimizable(Jbca, 0, 0)
 ]
 print('MAXITER =', MAXITER)
 print('# free dofs =', len(dofs))
@@ -179,8 +184,13 @@ res = minimize(
         'verbose': 2,
     },
 )
-save([Jstress], 'Jstress_fin.json')
 time_filament_2 = time.time()
-Jstress.save_run_vtu('fin_run')
 print('time', time_filament_2 - time_filament_1)
 print('res ', res)
+save([Jstress], 'Jstress_fin.json')
+Jstress.save_run_vtu('fin_run')
+with open("results.pkl", "wb") as file:
+    pickle.dump({
+        'res': res,
+        'time': time_filament_2 - time_filament_1,
+    }, file)
