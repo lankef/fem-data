@@ -69,11 +69,14 @@ def load_vtu_problem(path: str = VTU_PATH):
         )
 
     el = basix.ufl.element("Lagrange", "tetrahedron", 2, shape=(3,))
+    # dolfinx 0.9: create_mesh(comm, cells, x, e)
+    # dolfinx 0.10+: create_mesh(comm, cells, e, x)
+    # Use keywords so both argument orders work.
     domain = create_mesh(
         MPI.COMM_WORLD,
-        np.asarray(cells, dtype=np.int64),
-        np.asarray(m.points, dtype=np.float64),
-        ufl.Mesh(el),
+        np.ascontiguousarray(cells, dtype=np.int64),
+        x=np.ascontiguousarray(m.points, dtype=np.float64),
+        e=ufl.Mesh(el),
     )
 
     fd = m.field_data
