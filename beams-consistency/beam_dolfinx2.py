@@ -55,6 +55,12 @@ _VTK_TO_MESHIO = {
     71: "tetra10",
 }
 
+# meshio / VTK quadratic tetra10 edge mids: (01)(12)(20)(03)(13)(23).
+# basix / dolfinx P2 geometry expects edge mids: (23)(13)(12)(03)(02)(01).
+# Reorder VTK connectivity → basix before create_mesh; otherwise mid-edge
+# nodes attach to the wrong edges and ParaView shows a shredded mesh.
+_VTK_TET10_TO_BASIX = np.array([0, 1, 2, 3, 9, 8, 5, 7, 6, 4], dtype=np.int64)
+
 
 def load_vtu_problem(path: str = VTU_PATH):
     """Load dolfinx mesh and physics params from an enriched VTU."""
@@ -68,13 +74,14 @@ def load_vtu_problem(path: str = VTU_PATH):
             f"{path} missing FieldData {missing}. Re-run mesh export Step 4D."
         )
 
+    cells = np.ascontiguousarray(cells[:, _VTK_TET10_TO_BASIX], dtype=np.int64)
     el = basix.ufl.element("Lagrange", "tetrahedron", 2, shape=(3,))
     # dolfinx 0.9: create_mesh(comm, cells, x, e)
     # dolfinx 0.10+: create_mesh(comm, cells, e, x)
     # Use keywords so both argument orders work.
     domain = create_mesh(
         MPI.COMM_WORLD,
-        np.ascontiguousarray(cells, dtype=np.int64),
+        cells,
         x=np.ascontiguousarray(m.points, dtype=np.float64),
         e=ufl.Mesh(el),
     )
