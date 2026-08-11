@@ -2,7 +2,7 @@
 #SBATCH --account=torch_pr_292_courant
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=100G
-#SBATCH --time=10:00:00
+#SBATCH --time=02:00:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
 #SBATCH --gres=gpu:l40s:1
@@ -20,6 +20,7 @@ echo "Nodes:          $SLURM_JOB_NUM_NODES"
 echo "CPUs per task:  $SLURM_CPUS_PER_TASK"
 echo "Start time:     $(date)"
 conda activate desc
-python -u ./run_all.py 
+mkdir dolfinx
+python -u ./run_fwd.py 
 
 echo "End time:       $(date)"

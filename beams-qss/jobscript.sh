@@ -22,6 +22,6 @@ echo "Nodes:          $SLURM_JOB_NUM_NODES"
 echo "CPUs per task:  $SLURM_CPUS_PER_TASK"
 echo "Start time:     $(date)"
 conda activate desc
-python -u ./proto_cons.py 
+python -u ./optimize_beams.py 
 
 echo "End time:       $(date)"

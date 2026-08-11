@@ -34,7 +34,7 @@
   "fixed_clamp_options": {
     "enabled": true,
     "r_clamp": 0.173,
-    "n_clamp": 2,
+    "n_clamp": 1,
     "E_coil": 205000000000.0
   },
   "coupling": "monolithic",

@@ -1,23 +1,23 @@
-"""Import the fused full-body mesh and run dolfinx elasticity with quadpoint force.
+"""Full-body dolfinx elasticity from ``full_body_fields.vtu`` + ``Jstress.json``.
 
-Reads ``full_mesh.msh`` (TET10) and the classification/clamp sidecar
-``body_force.npz`` (no ``f_vol``).  Lorentz body force is evaluated at volume
-quadrature points via coil-fem Biot–Savart / ``B_self_quadrature`` (same
-physics as CoilFEM), packed into a dolfinx ``quadrature_element`` Function,
-and assembled with a matching ``quadrature_degree`` on ``dx``.
+Purpose-built path for the VTU+JSON workflow (no ``.msh`` / ``body_force.npz``).
 
-Winkler weights use analytic clamp spheres at facet quadrature points
-(``clamp_sigmoid``), not a P2-interpolated nodal weight field.
+The VTU carries the TET10 mesh, nodal classification fields, and FieldData for
+clamp / material / gravity parameters.  ``Jstress.json`` supplies coil geometry
+and currents for Lorentz body force at volume quadrature points.
 
-No thermal eigenstrain is applied; CoilFEM's notebook case may include
-``itc = 0.0029`` prestress.
+Winkler clamps use analytic spheres from FieldData (same model as
+``beam_dolfinx.py``), evaluated at facet quadrature points — not the nodal
+``w_clamp`` point data.
+
+DOF numbering may differ from the gmshio/``.msh`` import; compare solutions by
+matching geometry coordinates.
 """
 
 from __future__ import annotations
 
 import time
 
-import basix
 import basix.ufl
 import interpax
 import jax.numpy as jnp
@@ -32,118 +32,86 @@ from dolfinx import fem
 from dolfinx import mesh as dmesh
 from dolfinx import plot as dfx_plot
 from dolfinx.fem.petsc import LinearProblem
-
-try:
-    from dolfinx.io import gmshio  # dolfinx <= 0.9
-except ImportError:  # dolfinx >= 0.10 renamed gmshio -> gmsh
-    from dolfinx.io import gmsh as gmshio
+from dolfinx.mesh import create_mesh
 
 from coil_fem.magnetic import biot_savart, B_self_quadrature, lorentz_body_force
-from coil_fem.utils import clamp_sigmoid
 
-MESH_PATH = "full_mesh.msh"
-BODY_FORCE_PATH = "body_force.npz"
+VTU_PATH = "full_body_fields.vtu"
 JSTRESS_PATH = "Jstress.json"
-OUT_VTU = "full_body_elasticity.vtu"
+OUT_VTU = "full_body_elasticity2.vtu"
 VOL_QUAD_DEG = 4
 CHUNK = 32_768
 N_PHI = 4096
 UV_TOL = 2e-2
 
-# VTK cell-type integers returned by dolfinx.plot.vtk_mesh → meshio names.
+_FIELD_KEYS = (
+    "clamp_centers", "r_clamp", "eps_sigmoid", "k_clamp",
+    "E", "nu", "rho", "g_vec",
+)
+
 _VTK_TO_MESHIO = {
-    10: "tetra",                 # VTK_TETRA
-    24: "tetra10",               # VTK_QUADRATIC_TETRA
-    71: "tetra10",               # VTK_LAGRANGE_TETRAHEDRON (order 2 → 10 nodes)
+    10: "tetra",
+    24: "tetra10",
+    71: "tetra10",
 }
 
-
-def import_mesh(path: str = MESH_PATH):
-    """Read the fused device mesh into a dolfinx ``Mesh``."""
-    result = gmshio.read_from_msh(
-        path, MPI.COMM_WORLD, rank=0, gdim=3,
-    )
-    if hasattr(result, "mesh"):  # dolfinx >= 0.10 returns a MeshData object
-        domain = result.mesh
-        cell_tags = getattr(result, "cell_tags", None)
-        facet_tags = getattr(result, "facet_tags", None)
-    else:  # dolfinx <= 0.9 returns a (mesh, cell_tags, facet_tags) tuple
-        domain, cell_tags, facet_tags = result
-    return domain, cell_tags, facet_tags
+# meshio / VTK quadratic tetra10 edge mids: (01)(12)(20)(03)(13)(23).
+# basix / dolfinx P2 geometry expects edge mids: (23)(13)(12)(03)(02)(01).
+# Reorder VTK connectivity → basix before create_mesh; otherwise mid-edge
+# nodes attach to the wrong edges and ParaView shows a shredded mesh.
+_VTK_TET10_TO_BASIX = np.array([0, 1, 2, 3, 9, 8, 5, 7, 6, 4], dtype=np.int64)
 
 
-def exterior_node_indices(domain):
-    """Return DOF indices and coordinates of every exterior mesh node."""
-    tdim = domain.topology.dim
-    fdim = tdim - 1
-    domain.topology.create_connectivity(fdim, tdim)
-    exterior_facets = dmesh.exterior_facet_indices(domain.topology)
-
-    degree = domain.geometry.cmap.degree
-    V = fem.functionspace(domain, ("Lagrange", degree))
-    exterior_dofs = fem.locate_dofs_topological(V, fdim, exterior_facets)
-    exterior_coords = V.tabulate_dof_coordinates()[exterior_dofs]
-    return exterior_dofs, exterior_coords
-
-
-def clamp_weight_at(
-    points: np.ndarray,
-    centers: np.ndarray,
-    r_clamp: float,
-    eps_sigmoid: float,
-) -> np.ndarray:
-    """Sum of ``clamp_sigmoid`` over clamp centres at each query point."""
-    pts = jnp.asarray(points, dtype=jnp.float64)
-    ctr = jnp.asarray(centers, dtype=jnp.float64)
-    d_sq = jnp.sum((pts[:, None, :] - ctr[None, :, :]) ** 2, axis=-1)
-    return np.asarray(
-        clamp_sigmoid(d_sq, float(r_clamp), float(eps_sigmoid)).sum(axis=-1),
-        dtype=np.float64,
-    )
-
-
-def clamp_weight_ufl(x, centers, r_clamp: float, eps_sigmoid: float):
-    """UFL weight matching :func:`clamp_weight_at` at facet quadrature points."""
-    width2 = float(eps_sigmoid * r_clamp) ** 2
-    r2 = float(r_clamp) ** 2
-    w = 0
-    for c in np.asarray(centers, dtype=np.float64):
-        d_sq = (
-            (x[0] - float(c[0])) ** 2
-            + (x[1] - float(c[1])) ** 2
-            + (x[2] - float(c[2])) ** 2
-        )
-        w = w + 1.0 / (1.0 + ufl.exp(-(r2 - d_sq) / width2))
-    return w
-
-
-def load_mesh_sidecar(path: str = BODY_FORCE_PATH):
-    """Load classification / clamp / material sidecar (no ``f_vol`` / ``B_*``)."""
-    data = np.load(path)
-    required = (
-        "clamp_centers", "r_clamp", "eps_sigmoid", "k_clamp",
-        "E", "nu", "rho", "g_vec",
-    )
-    missing = [k for k in required if k not in data.files]
+def load_vtu_problem(path: str = VTU_PATH):
+    """Load dolfinx mesh and physics params from an enriched VTU."""
+    m = meshio.read(path)
+    cells = m.get_cells_type("tetra10")
+    if cells.size == 0:
+        raise ValueError(f"{path} has no tetra10 cells")
+    missing = [k for k in _FIELD_KEYS if k not in m.field_data]
     if missing:
         raise KeyError(
-            f"{path} missing keys {missing}. Re-run mesh.ipynb Step 4 export."
+            f"{path} missing FieldData {missing}. Re-run mesh export Step 4D."
         )
-    if "f_vol" in data.files:
-        raise ValueError(
-            f"{path} still contains 'f_vol'. Re-export with the stripped "
-            f"mesh.ipynb (force is computed here at volume quads)."
-        )
-    return data
+
+    cells = np.ascontiguousarray(cells[:, _VTK_TET10_TO_BASIX], dtype=np.int64)
+    el = basix.ufl.element("Lagrange", "tetrahedron", 2, shape=(3,))
+    # dolfinx 0.9: create_mesh(comm, cells, x, e)
+    # dolfinx 0.10+: create_mesh(comm, cells, e, x)
+    # Use keywords so both argument orders work.
+    domain = create_mesh(
+        MPI.COMM_WORLD,
+        cells,
+        x=np.ascontiguousarray(m.points, dtype=np.float64),
+        e=ufl.Mesh(el),
+    )
+
+    fd = m.field_data
+    params = {
+        "clamp_centers": np.asarray(fd["clamp_centers"], dtype=np.float64).reshape(-1, 3),
+        "r_clamp": float(np.asarray(fd["r_clamp"]).reshape(-1)[0]),
+        "eps_sigmoid": float(np.asarray(fd["eps_sigmoid"]).reshape(-1)[0]),
+        "k_clamp": float(np.asarray(fd["k_clamp"]).reshape(-1)[0]),
+        "E": float(np.asarray(fd["E"]).reshape(-1)[0]),
+        "nu": float(np.asarray(fd["nu"]).reshape(-1)[0]),
+        "rho": float(np.asarray(fd["rho"]).reshape(-1)[0]),
+        "g_vec": np.asarray(fd["g_vec"], dtype=np.float64).reshape(3),
+    }
+    return domain, params
 
 
-def physical_volume_quad_points(domain, vol_quad_deg: int = VOL_QUAD_DEG):
-    """Physical volume quadrature coordinates, shape ``(n_cells, n_quads, 3)``.
+def load_jstress(path: str = JSTRESS_PATH):
+    """Load CoilFEMObjective and coil cross-section widths."""
+    objs = load(path)
+    Jstress = objs[0] if isinstance(objs, (list, tuple)) else objs
+    mesh_options = Jstress._mesh_options
+    if isinstance(mesh_options, list):
+        mesh_options = mesh_options[0]
+    return Jstress, float(mesh_options["w1"]), float(mesh_options["w2"])
 
-    Uses a vector ``quadrature_element`` Function interpolated from
-    ``SpatialCoordinate``, so ordering matches FFCx assembly for the same
-    ``quadrature_degree``.
-    """
+
+def volume_quad_points(domain, vol_quad_deg: int = VOL_QUAD_DEG):
+    """Physical volume quadrature coords, shape ``(n_cells, n_quads, 3)``."""
     Qe = basix.ufl.quadrature_element(
         domain.topology.cell_name(),
         value_shape=(3,),
@@ -163,8 +131,7 @@ def physical_volume_quad_points(domain, vol_quad_deg: int = VOL_QUAD_DEG):
     n_quads = arr.shape[0] // n_cells
     if arr.shape[0] != n_cells * n_quads:
         raise RuntimeError(
-            f"quad packing mismatch: {arr.shape[0]} values, "
-            f"{n_cells} cells"
+            f"quad packing mismatch: {arr.shape[0]} values, {n_cells} cells"
         )
     return arr.reshape(n_cells, n_quads, 3), n_quads
 
@@ -182,17 +149,8 @@ def _symmetry_Q_list(nfp: int, stellsym: bool) -> np.ndarray:
     return np.asarray(Q_list)
 
 
-def inverse_map_points(points: np.ndarray, Jstress, *, w1: float, w2: float):
-    """Classify physical points into conductor vs beam via (φ, u, v) pullback.
-
-    Same algorithm as mesh.ipynb Step 4A, applied to an arbitrary point cloud
-    (volume quadrature points here).
-
-    Returns
-    -------
-    owner_coil, owner_sym : (N,) int8
-    phi, u, v : (N,) float64
-    """
+def _classify_points(points: np.ndarray, Jstress, *, w1: float, w2: float):
+    """Conductor vs beam via (φ, u, v) pullback; returns owners, coords, Q_list."""
     support = Jstress.fem.support
     nfp, stellsym = support.nfp, support.stellsym
     n_base = len(Jstress.fem.meshes)
@@ -205,9 +163,8 @@ def inverse_map_points(points: np.ndarray, Jstress, *, w1: float, w2: float):
     gamma_s, p_s, q_s = [], [], []
     for coil_mesh in Jstress.fem.meshes:
         fc = coil_mesh.framed_curve
-        g = np.asarray(fc.curve.gamma_eval(phi_s))
+        gamma_s.append(np.asarray(fc.curve.gamma_eval(phi_s)))
         _, p, q = fc.rotated_frame_eval(phi_s)
-        gamma_s.append(np.asarray(g))
         p_s.append(np.asarray(p))
         q_s.append(np.asarray(q))
 
@@ -255,8 +212,7 @@ def inverse_map_points(points: np.ndarray, Jstress, *, w1: float, w2: float):
             Qs = Q_list[s_sel]
             y = np.einsum("ni,nij->nj", X[sel], Qs)
 
-            fc = Jstress.fem.meshes[i].framed_curve
-            curve = fc.curve
+            curve = Jstress.fem.meshes[i].framed_curve.curve
             phi_n = phi_guess.copy()
             for _ in range(2):
                 g0 = np.asarray(curve.gamma_eval(phi_n, 0))
@@ -290,7 +246,7 @@ def inverse_map_points(points: np.ndarray, Jstress, *, w1: float, w2: float):
     return owner_coil, owner_sym, phi_out, u_out, v_out, Q_list
 
 
-def compute_f_vol_at_quads(
+def body_force_at_quads(
     quad_pts: np.ndarray,
     Jstress,
     *,
@@ -299,21 +255,10 @@ def compute_f_vol_at_quads(
     w1: float,
     w2: float,
 ) -> np.ndarray:
-    """Lorentz (+ gravity) body force at physical volume quads.
-
-    Parameters
-    ----------
-    quad_pts : ndarray, shape (n_cells, n_quads, 3)
-    Jstress : CoilFEMObjective
-    rho, g_vec, w1, w2
-
-    Returns
-    -------
-    ndarray, shape (n_cells, n_quads, 3)
-    """
+    """Lorentz (+ gravity) at volume quads → shape ``(n_cells, n_quads, 3)``."""
     n_cells, n_quads, _ = quad_pts.shape
     pts = quad_pts.reshape(-1, 3)
-    owner_coil, owner_sym, phi_out, u_out, v_out, Q_list = inverse_map_points(
+    owner_coil, owner_sym, phi_out, u_out, v_out, Q_list = _classify_points(
         pts, Jstress, w1=w1, w2=w2,
     )
     n_cond = int((owner_coil >= 0).sum())
@@ -364,7 +309,6 @@ def compute_f_vol_at_quads(
             continue
         coil_mesh = Jstress.fem.meshes[i]
         fc = coil_mesh.framed_curve
-        curve = fc.curve
         A = coil_mesh.cross_section_area
         I = all_currents[i]
         cross_section = {"shape": "rect", "w1": coil_mesh.w1, "w2": coil_mesh.w2}
@@ -373,7 +317,7 @@ def compute_f_vol_at_quads(
         uv_i = np.stack([u_out[sel], v_out[sel]], axis=1)
         y_i = y_base[sel]
 
-        gd = np.asarray(curve.gamma_eval(phi_i, 1))
+        gd = np.asarray(fc.curve.gamma_eval(phi_i, 1))
         t_hat = gd / np.linalg.norm(gd, axis=1, keepdims=True)
         J = (float(I) / A) * t_hat
 
@@ -394,15 +338,13 @@ def compute_f_vol_at_quads(
     return f_vol.reshape(n_cells, n_quads, 3)
 
 
-def make_quadrature_force_function(domain, f_vol_q: np.ndarray, vol_quad_deg: int):
-    """Pack ``(n_cells, n_quads, 3)`` into a vector quadrature-element Function."""
+def _pack_quadrature_force(domain, f_vol_q: np.ndarray, vol_quad_deg: int):
     Qe = basix.ufl.quadrature_element(
         domain.topology.cell_name(),
         value_shape=(3,),
         degree=vol_quad_deg,
     )
-    W = fem.functionspace(domain, Qe)
-    f = fem.Function(W)
+    f = fem.Function(fem.functionspace(domain, Qe))
     flat = np.asarray(f_vol_q, dtype=np.float64).reshape(-1)
     if flat.size != f.x.array.size:
         raise RuntimeError(
@@ -413,41 +355,46 @@ def make_quadrature_force_function(domain, f_vol_q: np.ndarray, vol_quad_deg: in
     return f
 
 
-def solve_elasticity_winkler(
-    domain,
-    f,
-    *,
-    E: float,
-    nu: float,
-    k_clamp: float,
-    clamp_centers: np.ndarray,
-    r_clamp: float,
-    eps_sigmoid: float,
-    vol_quad_deg: int = VOL_QUAD_DEG,
-):
-    """Solve linear elasticity with analytic clamp Winkler + quadpoint body force."""
-    lam_val = E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu))
-    mu_val = E / (2.0 * (1.0 + nu))
-    lam = fem.Constant(domain, lam_val)
-    mu = fem.Constant(domain, mu_val)
+def _clamp_weight_ufl(x, centers, r_clamp: float, eps_sigmoid: float):
+    width2 = float(eps_sigmoid * r_clamp) ** 2
+    r2 = float(r_clamp) ** 2
+    w = 0
+    for c in np.asarray(centers, dtype=np.float64):
+        d_sq = (
+            (x[0] - float(c[0])) ** 2
+            + (x[1] - float(c[1])) ** 2
+            + (x[2] - float(c[2])) ** 2
+        )
+        w = w + 1.0 / (1.0 + ufl.exp(-(r2 - d_sq) / width2))
+    return w
+
+
+def solve_winkler(domain, f, params: dict, *, vol_quad_deg: int = VOL_QUAD_DEG):
+    """Linear elasticity + analytic Winkler on the exterior; return uh, von Mises."""
+    E = float(params["E"])
+    nu = float(params["nu"])
+    k_clamp = float(params["k_clamp"])
+    clamp_centers = params["clamp_centers"]
+    r_clamp = float(params["r_clamp"])
+    eps_sigmoid = float(params["eps_sigmoid"])
+
+    lam = fem.Constant(domain, E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)))
+    mu = fem.Constant(domain, E / (2.0 * (1.0 + nu)))
 
     degree = domain.geometry.cmap.degree
     V = fem.functionspace(domain, ("Lagrange", degree, (3,)))
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
-    def sigma_elastic(u_fn):
+    def sigma(u_fn):
         eps = ufl.sym(ufl.grad(u_fn))
         return lam * ufl.tr(eps) * ufl.Identity(3) + 2 * mu * eps
-
-    def sigma(u_fn):
-        return sigma_elastic(u_fn)
 
     dx = ufl.Measure(
         "dx", domain=domain,
         metadata={"quadrature_degree": vol_quad_deg},
     )
-    a = ufl.inner(sigma_elastic(u), ufl.sym(ufl.grad(v))) * dx
+    a = ufl.inner(sigma(u), ufl.sym(ufl.grad(v))) * dx
     L = ufl.inner(f, v) * dx
 
     tdim = domain.topology.dim
@@ -457,43 +404,31 @@ def solve_elasticity_winkler(
     facet_tags = dmesh.meshtags(
         domain, fdim, ext_facets, np.ones(len(ext_facets), dtype=np.int32),
     )
-    face_quad_deg = 4 if degree == 2 else 2
     ds = ufl.Measure(
         "ds", domain=domain,
         subdomain_data=facet_tags, subdomain_id=1,
-        metadata={"quadrature_degree": face_quad_deg},
+        metadata={"quadrature_degree": 4 if degree == 2 else 2},
     )
     x = ufl.SpatialCoordinate(domain)
-    w_ufl = clamp_weight_ufl(x, clamp_centers, r_clamp, eps_sigmoid)
-    a = a + float(k_clamp) * w_ufl * ufl.inner(u, v) * ds
+    a = a + float(k_clamp) * _clamp_weight_ufl(
+        x, clamp_centers, r_clamp, eps_sigmoid,
+    ) * ufl.inner(u, v) * ds
 
-    try:
-        problem = LinearProblem(
-            a, L, bcs=[],
-            petsc_options_prefix="full_body_elasticity",
-            petsc_options={
-                "ksp_type": "preonly",
-                "pc_type": "lu",
-                "pc_factor_mat_solver_type": "mumps",
-            },
-        )
-        uh = problem.solve()
-    except TypeError:
-        problem = LinearProblem(
-            a, L, bcs=[], petsc_options_prefix="full_body_elasticity_fb",
-        )
-        uh = problem.solve()
+    problem = LinearProblem(
+        a, L, bcs=[],
+        petsc_options_prefix="full_body_elasticity2",
+        petsc_options={
+            "ksp_type": "preonly",
+            "pc_type": "lu",
+            "pc_factor_mat_solver_type": "mumps",
+        },
+    )
+    uh = problem.solve()
 
-    # Von Mises at volume Gauss points, then cell mean.
     vm_quad_degree = 2 if degree == 2 else 1
-    try:
-        vol_quad_el = basix.ufl.quadrature_element(
-            "tetrahedron", value_shape=(), degree=vm_quad_degree,
-        )
-    except TypeError:
-        vol_quad_el = basix.ufl.quadrature_element(
-            "tetrahedron", "default", vm_quad_degree, (),
-        )
+    vol_quad_el = basix.ufl.quadrature_element(
+        "tetrahedron", value_shape=(), degree=vm_quad_degree,
+    )
 
     def von_mises_ufl(u_fn):
         sig = sigma(u_fn)
@@ -504,18 +439,27 @@ def solve_elasticity_winkler(
     interp_pts = W.element.interpolation_points
     if callable(interp_pts):
         interp_pts = interp_pts()
-    vm_expr = fem.Expression(von_mises_ufl(uh), interp_pts)
     vm_fn = fem.Function(W)
-    vm_fn.interpolate(vm_expr)
+    vm_fn.interpolate(fem.Expression(von_mises_ufl(uh), interp_pts))
 
     n_cells = domain.topology.index_map(tdim).size_local
-    n_quads = vm_fn.x.array.shape[0] // n_cells
+    n_q = vm_fn.x.array.shape[0] // n_cells
     von_mises_Pa = np.asarray(
-        vm_fn.x.array.reshape(n_cells, n_quads).mean(axis=1),
+        vm_fn.x.array.reshape(n_cells, n_q).mean(axis=1),
         dtype=np.float64,
     ).copy()
+    return uh, von_mises_Pa
 
-    return {"uh": uh, "von_mises_Pa": von_mises_Pa}
+
+def _clamp_weight_at(points, centers, r_clamp, eps_sigmoid):
+    from coil_fem.utils import clamp_sigmoid
+    pts = jnp.asarray(points, dtype=jnp.float64)
+    ctr = jnp.asarray(centers, dtype=jnp.float64)
+    d_sq = jnp.sum((pts[:, None, :] - ctr[None, :, :]) ** 2, axis=-1)
+    return np.asarray(
+        clamp_sigmoid(d_sq, float(r_clamp), float(eps_sigmoid)).sum(axis=-1),
+        dtype=np.float64,
+    )
 
 
 def write_result_vtu(
@@ -524,21 +468,14 @@ def write_result_vtu(
     *,
     uh,
     von_mises_Pa: np.ndarray,
-    clamp_centers: np.ndarray,
-    r_clamp: float,
-    eps_sigmoid: float,
-    k_clamp: float,
-    f_vol_cell: np.ndarray | None = None,
+    params: dict,
+    f_vol_cell: np.ndarray,
     atol: float = 1e-9,
 ) -> None:
-    """Write VTU: point displacement/w_clamp; cell von Mises and cell-mean f_vol."""
     topology, cell_types, x = dfx_plot.vtk_mesh(domain)
     vtk_type = int(cell_types[0])
     if vtk_type not in _VTK_TO_MESHIO:
-        raise ValueError(
-            f"Unsupported VTK cell type {vtk_type}; "
-            f"expected one of {sorted(_VTK_TO_MESHIO)}"
-        )
+        raise ValueError(f"Unsupported VTK cell type {vtk_type}")
     meshio_type = _VTK_TO_MESHIO[vtk_type]
     n_per_cell = int(topology[0])
     cells = topology.reshape(-1, n_per_cell + 1)[:, 1:]
@@ -548,125 +485,67 @@ def write_result_vtu(
     dist, idx = cKDTree(V_s.tabulate_dof_coordinates()).query(x, k=1)
     if float(np.max(dist)) > atol:
         raise RuntimeError(
-            f"VTK geometry ↔ DOF coordinate join failed: max dist "
+            f"VTK geometry ↔ DOF join failed: max dist "
             f"{float(np.max(dist)):.3e} m > atol {atol}"
         )
 
-    w_nodes = clamp_weight_at(
-        np.asarray(x, dtype=np.float64), clamp_centers, r_clamp, eps_sigmoid,
+    w_nodes = _clamp_weight_at(
+        np.asarray(x, dtype=np.float64),
+        params["clamp_centers"],
+        params["r_clamp"],
+        params["eps_sigmoid"],
     )
-    point_data = {
-        "displacement_m": np.asarray(
-            uh.x.array.reshape(-1, 3)[idx], dtype=np.float64,
-        ),
-        "w_clamp": w_nodes,
-        "k_clamp_Npm3": w_nodes * float(k_clamp),
+    cell_data = {
+        "von_mises_MPa": [von_mises_Pa / 1e6],
+        "f_vol_Npm3": [np.asarray(f_vol_cell, dtype=np.float64)],
     }
-
-    if cells.shape[0] != von_mises_Pa.shape[0]:
-        raise RuntimeError(
-            f"Cell count mismatch: vtk_mesh={cells.shape[0]}, "
-            f"von_mises={von_mises_Pa.shape[0]}"
-        )
-
-    cell_data = {"von_mises_MPa": [von_mises_Pa / 1e6]}
-    if f_vol_cell is not None:
-        f_cell = np.asarray(f_vol_cell, dtype=np.float64)
-        if f_cell.shape != (cells.shape[0], 3):
-            raise RuntimeError(
-                f"f_vol_cell shape {f_cell.shape} != "
-                f"({cells.shape[0]}, 3)"
-            )
-        cell_data["f_vol_Npm3"] = [f_cell]
-
     meshio.Mesh(
         points=np.asarray(x, dtype=np.float64),
         cells=[(meshio_type, cells.astype(np.int32))],
-        point_data=point_data,
+        point_data={
+            "displacement_m": np.asarray(
+                uh.x.array.reshape(-1, 3)[idx], dtype=np.float64,
+            ),
+            "w_clamp": w_nodes,
+            "k_clamp_Npm3": w_nodes * float(params["k_clamp"]),
+        },
         cell_data=cell_data,
     ).write(out_path)
 
 
 def main():
-    domain, cell_tags, facet_tags = import_mesh()
+    domain, params = load_vtu_problem(VTU_PATH)
     tdim = domain.topology.dim
     print(f"cells: {domain.topology.index_map(tdim).size_global}")
     print(f"geometry nodes: {domain.geometry.x.shape[0]}")
     print(f"geometry degree: {domain.geometry.cmap.degree}")
 
-    exterior_dofs, exterior_coords = exterior_node_indices(domain)
-    print(f"exterior nodes: {exterior_coords.shape[0]}")
+    print(f"loading {JSTRESS_PATH} …")
+    Jstress, w1, w2 = load_jstress(JSTRESS_PATH)
 
-    data = load_mesh_sidecar()
-    clamp_centers = np.asarray(data["clamp_centers"], dtype=np.float64)
-    r_clamp = float(data["r_clamp"])
-    eps_sigmoid = float(data["eps_sigmoid"])
-    E = float(data["E"])
-    nu = float(data["nu"])
-    k_clamp = float(data["k_clamp"])
-    rho = float(data["rho"])
-    g_vec = np.asarray(data["g_vec"], dtype=np.float64)
-
-    w_ext = clamp_weight_at(exterior_coords, clamp_centers, r_clamp, eps_sigmoid)
-    print(
-        f"analytic exterior w_clamp range: "
-        f"[{float(w_ext.min()):.3g}, {float(w_ext.max()):.3g}]"
-    )
-    if "support_weight" in data.files:
-        cond = data["owner_coil"] >= 0
-        w_ref = data["support_weight"][cond]
-        w_an = clamp_weight_at(
-            data["points"][cond], clamp_centers, r_clamp, eps_sigmoid,
-        )
-        print(
-            f"analytic vs npz support_weight max |Δ| on conductor: "
-            f"{np.max(np.abs(w_ref - w_an)):.3e}"
-        )
-
-    print(f"loading {JSTRESS_PATH} for coil geometry / currents …")
-    objs = load(JSTRESS_PATH)
-    Jstress = objs[0] if isinstance(objs, (list, tuple)) else objs
-    mesh_options = Jstress._mesh_options
-    if isinstance(mesh_options, list):
-        mesh_options = mesh_options[0]
-    w1 = float(mesh_options["w1"])
-    w2 = float(mesh_options["w2"])
-
-    quad_pts, n_quads = physical_volume_quad_points(domain, VOL_QUAD_DEG)
+    quad_pts, n_quads = volume_quad_points(domain, VOL_QUAD_DEG)
     n_cells = quad_pts.shape[0]
     print(
         f"volume quads: n_cells={n_cells}, n_quads={n_quads}, "
         f"degree={VOL_QUAD_DEG}"
     )
 
-    f_vol_q = compute_f_vol_at_quads(
-        quad_pts, Jstress, rho=rho, g_vec=g_vec, w1=w1, w2=w2,
+    f_vol_q = body_force_at_quads(
+        quad_pts, Jstress,
+        rho=params["rho"], g_vec=params["g_vec"], w1=w1, w2=w2,
     )
-    f = make_quadrature_force_function(domain, f_vol_q, VOL_QUAD_DEG)
-    print(
-        f"quadrature f DOFs: {f.x.array.size} "
-        f"(expect {n_cells * n_quads * 3})"
-    )
+    f = _pack_quadrature_force(domain, f_vol_q, VOL_QUAD_DEG)
 
     print(
-        f"solving: E={E:.3e} Pa, nu={nu}, k_clamp={k_clamp:.3e} N/m³, "
-        f"n_clamps={clamp_centers.shape[0]}, r_clamp={r_clamp:.4g}, "
-        f"eps_sigmoid={eps_sigmoid:.4g}"
+        f"solving: E={params['E']:.3e} Pa, nu={params['nu']}, "
+        f"k_clamp={params['k_clamp']:.3e} N/m³, "
+        f"n_clamps={params['clamp_centers'].shape[0]}, "
+        f"r_clamp={params['r_clamp']:.4g}, "
+        f"eps_sigmoid={params['eps_sigmoid']:.4g}"
     )
-
-    time1 = time.time()
-    sol = solve_elasticity_winkler(
-        domain, f,
-        E=E, nu=nu, k_clamp=k_clamp,
-        clamp_centers=clamp_centers,
-        r_clamp=r_clamp,
-        eps_sigmoid=eps_sigmoid,
-        vol_quad_deg=VOL_QUAD_DEG,
-    )
-    uh = sol["uh"]
-    vm = sol["von_mises_Pa"]
-    time2 = time.time()
-    np.save("time_dolfinx", time2 - time1)
+    t0 = time.time()
+    uh, vm = solve_winkler(domain, f, params, vol_quad_deg=VOL_QUAD_DEG)
+    print(f"solve time: {time.time() - t0:.1f} s")
     print(
         f"|u|_max = "
         f"{np.linalg.norm(uh.x.array.reshape(-1, 3), axis=1).max():.3e} m"
@@ -676,15 +555,10 @@ def main():
         f"[{vm.min() / 1e6:.3g}, {vm.max() / 1e6:.3g}] MPa"
     )
 
-    f_vol_cell = f_vol_q.mean(axis=1)
     write_result_vtu(
         domain, OUT_VTU,
-        uh=uh, von_mises_Pa=vm,
-        clamp_centers=clamp_centers,
-        r_clamp=r_clamp,
-        eps_sigmoid=eps_sigmoid,
-        k_clamp=k_clamp,
-        f_vol_cell=f_vol_cell,
+        uh=uh, von_mises_Pa=vm, params=params,
+        f_vol_cell=f_vol_q.mean(axis=1),
     )
     print(f"wrote {OUT_VTU}")
 
