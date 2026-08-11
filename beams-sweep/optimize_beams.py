@@ -24,6 +24,7 @@ from simsopt.mhd import Vmec
 from simsopt.geo import CurveSurfaceDistance
 from simsopt import save
 import json
+import os
 import numpy as np
 import jax
 import time
@@ -44,6 +45,7 @@ n_phi = 25
 n_theta = 50
 MAXITER = 1000
 MAXFUN = 10000
+save_dir = os.environ.get('SAVE_DIR', 'data/')
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -77,7 +79,9 @@ gravity_options = opts['gravity_options']
 problem_options = opts['problem_options']
 physics_options = opts['physics_options']
 beam_options = opts['beam_options']
-fixed_clamp_options = {'enabled': False} # opts['fixed_clamp_options']
+beam_options['n_beam_cc'] = int(os.environ.get('N_BEAM_CC', beam_options['n_beam_cc']))
+fixed_clamp_options = opts['fixed_clamp_options']
+fixed_clamp_options['n_clamp'] = int(os.environ.get('N_CLAMP', fixed_clamp_options['n_clamp']))
 mesh_scale = 0.5
 
 # ----- Defining optimizable ----- 
@@ -107,8 +111,8 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = opts['coupling'],
 )
-save([Jstress], 'init_Jstress.json')
-Jstress.save_run_vtu('init_run')
+save([Jstress], save_dir + 'init_Jstress.json')
+Jstress.save_run_vtu(save_dir + 'init_run')
 with open('init_summary.json', 'w') as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
@@ -207,15 +211,15 @@ res = minimize(
 time_filament_2 = time.time()
 print('time', time_filament_2 - time_filament_1)
 print('res ', res)
-save([Jstress], 'fin_Jstress.json')
-Jstress.save_run_vtu('fin_run')
-with open("fin_results.pkl", "wb") as file:
+save([Jstress], save_dir + 'fin_Jstress.json')
+Jstress.save_run_vtu(save_dir + 'fin_run')
+with open(save_dir + "fin_results.pkl", "wb") as file:
     pickle.dump({
         'res': res,
         'time': time_filament_2 - time_filament_1,
     }, file)
 
-with open('fin_summary.json', 'w') as fp:
+with open(save_dir + 'fin_summary.json', 'w') as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
 
