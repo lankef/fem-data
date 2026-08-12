@@ -19,7 +19,7 @@ export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export XLA_PYTHON_CLIENT_MEM_FRACTION=0.9
 
 n_clamp_vals=(0 1 2 3)
-n_beam_cc_vals=(0 2 4 6)
+n_beam_cc_vals=(2 4 6)
 i=$((SLURM_ARRAY_TASK_ID / 4))
 j=$((SLURM_ARRAY_TASK_ID % 4))
 export N_CLAMP=${n_clamp_vals[$i]}
