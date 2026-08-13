@@ -3,9 +3,9 @@ import numpy as np
 from pathlib import Path
 from simsopt import load
 from coil_fem.io import to_full_body
-for path in sorted(Path('.').glob('Jstress_*.json')):
+for path in sorted(Path('.').glob('*_Jstress.json')):
     time1 = time.time()
-    name = path.stem.removeprefix('Jstress_')  # e.g. Jstress_full.json -> full
+    name = path.stem.removesuffix('_Jstress')  # e.g. Jstress_full.json -> full
     Jstress = load(str(path))[0]
     out_dir = Path(f'./{name}_dolfinx')
     out_dir.mkdir(parents=True, exist_ok=True)
