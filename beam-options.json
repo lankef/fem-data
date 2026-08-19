@@ -24,7 +24,7 @@
     "type": "elastic"
   },
   "beam_options": {
-    "n_beam_cc": 4,
+    "n_beam_cc": 6,
     "n_beam_cf": 0,
     "E": 205000000000.0,
     "nu": 0.3,

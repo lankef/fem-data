@@ -18,9 +18,9 @@ from coil_fem.simsopt import (
     CoilFEMObjective,
     constraint_from_optimizable
 )
+from simsopt._core.optimizable import Optimizable
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
-from simsopt.geo import CurveSurfaceDistance
 from simsopt import save
 import json
 import numpy as np
@@ -28,27 +28,49 @@ import jax
 import time
 import json
 import pickle
+import sys
 from collections import defaultdict
 from pathlib import Path
-from simsopt.field import Coil
+from simsopt.field import Coil, coils_via_symmetries, BiotSavart
 from scipy.optimize import minimize, Bounds, LinearConstraint
+from simsopt.objectives import SquaredFlux
+from simsopt.field.force import LpCurveForce
+from simsopt.geo import (
+    CurveLength, CurveCurveDistance,
+    SurfaceRZFourier,
+    CurveSurfaceDistance,
+    LinkingNumber,
+    create_equally_spaced_curves,
+    LpCurveCurvature
+)
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from opt_utils import (
+    load_eq,
+    ppp_for_target_quadpoints,
+    increase_base_curve_order,
+)
 
 # Loading the W7-X standard configuration 
 # plasma surface. wout file comes from Landreman"s
 # VMEC equilibrium archive: 
 # https://github.com/landreman/vmec_equilibria/blob/master/W7-X/Standard/
-eq = Vmec("../fixed-continuation/wout.nc", keep_all_files=True)
+# eq = Vmec("../fixed-continuation/wout.nc", keep_all_files=True)
+_WOUT_PATH = str(Path(__file__).resolve().parent / "../fixed-continuation/wout.nc")
+eq, Bnormal_plasma, plasma_surface, vc = load_eq(_WOUT_PATH)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
 MAXITER = 1000
 MAXFUN = 10000
-plasma_surface = type(eq.boundary)(
-    nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
-    mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
-    quadpoints_phi=np.linspace(0, 1/2/eq.boundary.nfp, n_phi, endpoint=False),
-    quadpoints_theta=np.linspace(0, 1, n_theta, endpoint=False),
-)
+Lp = 2
+# plasma_surface = type(eq.boundary)(
+#     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
+#     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
+#     quadpoints_phi=np.linspace(0, 1/2/eq.boundary.nfp, n_phi, endpoint=False),
+#     quadpoints_theta=np.linspace(0, 1, n_theta, endpoint=False),
+# )
 plasma_surface.set_dofs(eq.boundary.get_dofs())
 r_beam = 0.08
 # w1_beam = 0.2
@@ -76,17 +98,21 @@ curves, currents, axis, nfp, bs = get_data(
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
+coils = coils_via_symmetries(base_curves, base_currents, plasma_surface.nfp, True)
+curves_for_ccd = [c.curve for c in coils]
 
 # ----- Optimization targets -----
 
-# Setting targets
-Jf_norm = SquaredFlux(
-    plasma_surface_vc,
-    bs,
-    target=Bnormal_plasma,
-    definition='normalized',
-)
-FLUX_NORM_TARGET = Jf_norm.J()
+# Coil-coil distance
+Jccdist_init = CurveCurveDistance(curves_for_ccd, 0)
+CC_TARGET = Jccdist_init.shortest_distance()
+
+# Coil-surface distance
+Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
+CP_TARGET = Jcsdist_init.shortest_distance()
+
+# Curvature 
+CURVATURE_TARGET = np.max([c.kappa() for c in base_curves])
 
 # ----- FEM / support options -----
 
@@ -152,7 +178,7 @@ Jbca = BeamCurveAngle(
     coil_support, minimum_angle=np.pi/6, mode="all"
 )
 
-# ----- Beam-curve distance
+# ----- Beam-curve distance -----
 
 target_bcd = r_beam + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
 # target_bcd = np.sqrt(w1_beam**2 + w2_beam**2) + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
@@ -162,21 +188,31 @@ Jbcd = BeamCurveDistance(
     minimum_distance=target_bcd*0.9,
 )
 
+# ----- Biot-Savart -----
+
+Jf_norm = SquaredFlux(
+    plasma_surface,
+    bs,
+    target=Bnormal_plasma,
+    definition='normalized',
+)
+FLUX_NORM_TARGET = Jf_norm.J()
+
+# ----- CC and CS distance -----
+
+Jcc = CurveCurveDistance(curves_for_ccd, CC_TARGET)
+Jcs = CurveSurfaceDistance(base_curves, plasma_surface, CP_TARGET)
+curv_objs = [LpCurveCurvature(c, Lp, threshold=CURVATURE_TARGET) for c in base_curves]
+cons_curvature = [constraint_from_optimizable(c, 0, 0) for c in curv_objs]
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
 # CoilSupportBeamsSorted dofs (the beam network) are optimized.
-for c in base_curves:
-    c.fix_all()
+# for c in base_curves:
+#     c.fix_all()
 for cur in base_currents:
     cur.fix_all()
-    
-def fun(dofs):
-    Jstress.x = dofs
-    J = Jstress.J()
-    grad = Jstress.dJ()
-    return J, grad
-
 
 def _sum_dphis_constraint(dof_names):
     """Linear inequalities sum_j dphis*[i][j] <= 1 for each coil/group.
@@ -202,19 +238,33 @@ def _sum_dphis_constraint(dof_names):
         A[row, idxs] = 1.0
     return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
 
+# Since the curve dependencies are in the constraints,
+# not the objective, we create a dummy problem ti 
+# correctly transmit dofs.
+class Problem(Optimizable):
+    def __init__(self, *objs):
+        Optimizable.__init__(self, depends_on=list(objs))
+prob = Problem(Jstress, Jbsd, Jbca, Jbcd, Jf_norm, Jcc, Jcs, *curv_objs)
+
+def fun(dofs):
+    prob.x = dofs
+    return Jstress.J(), Jstress.dJ()
 
 # # Profiling
 # with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
 
-dofs = Jstress.x
-lb, ub = Jstress.bounds
+dofs = prob.x
+lb, ub = prob.bounds
 bounds = Bounds(lb, ub)
 constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
-    constraint_from_optimizable(Jbsd, 0, 0),
-    constraint_from_optimizable(Jbca, 0, 0),
-    constraint_from_optimizable(Jbcd, 0, 0)
-]
+    constraint_from_optimizable(Jbsd,    0, 0),
+    constraint_from_optimizable(Jbca,    0, 0),
+    constraint_from_optimizable(Jbcd,    0, 0),
+    constraint_from_optimizable(Jf_norm, 0, FLUX_NORM_TARGET),
+    constraint_from_optimizable(Jcc,     0, 0),
+    constraint_from_optimizable(Jcs,     0, 0),
+] + cons_curvature
 print("MAXITER =", MAXITER)
 print("# free dofs =", len(dofs))
 print("# linear inequality constraints =", constraints[0].A.shape[0])
