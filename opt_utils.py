@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import numpy as np
 import jax.numpy as jnp
-from scipy.optimize import NonlinearConstraint
+from scipy.optimize import Bounds, NonlinearConstraint
+from simsopt._core.optimizable import Optimizable
 from simsopt.mhd import Vmec
 from simsopt.mhd.virtual_casing import VirtualCasing
 from simsopt.geo import CurveXYZFourier
@@ -155,3 +156,71 @@ def optimizable_to_constraints(optimizable, lb, ub, full_dof_names, prob=None):
         return grad_full
 
     return NonlinearConstraint(fun=fun, lb=lb, ub=ub, jac=jac)
+
+
+class _Problem(Optimizable):
+    """Union node with no local DOFs that depends on all given Optimizables."""
+
+    def __init__(self, *objs):
+        Optimizable.__init__(self, depends_on=list(objs))
+
+
+def build_problem(objective, constraint_specs, linear_constraint_fns=None):
+    """Build a scipy-ready optimization problem from simsopt Optimizables.
+
+    Unifies all Optimizable objects into a single simsopt graph so that
+    every constraint and the objective share the same DOF vector.  Gradients
+    are scattered by DOF name into the full combined space.
+
+    Parameters
+    ----------
+    objective : Optimizable
+        The objective to minimise; must expose ``J()`` (scalar) and
+        ``dJ()`` (gradient w.r.t. its own DOFs).
+    constraint_specs : list of (Optimizable, float, float)
+        Each entry is ``(obj, lb, ub)``.  ``obj.J()`` is constrained to
+        ``[lb, ub]`` and ``obj.dJ()`` supplies the constraint Jacobian row.
+    linear_constraint_fns : list of callable or None
+        Each callable receives ``prob.dof_names`` (the full DOF name list)
+        and returns a ``scipy.optimize.LinearConstraint``.  Evaluated before
+        the nonlinear constraints in the returned list.
+
+    Returns
+    -------
+    x0 : np.ndarray
+        Starting point in the full combined DOF space.
+    fun : callable
+        ``fun(x) -> (J, grad)`` where both are in the full DOF space.
+    bounds : scipy.optimize.Bounds
+        Box bounds from ``prob.bounds`` in the full DOF space.
+    constraints : list
+        Ready to pass as ``constraints`` to ``scipy.optimize.minimize``.
+    """
+    constraint_objs = [obj for obj, _, _ in constraint_specs]
+    prob = _Problem(objective, *constraint_objs)
+    full_names = prob.dof_names
+    n = len(prob.x)
+
+    name_to_idx = {name: i for i, name in enumerate(full_names)}
+    obj_indices = np.array([name_to_idx[nm] for nm in objective.dof_names])
+
+    def fun(x):
+        prob.x = x
+        J = objective.J()
+        g_local = objective.dJ()
+        g_full = np.zeros(n)
+        g_full[obj_indices] = g_local
+        return J, g_full
+
+    constraints = []
+    if linear_constraint_fns:
+        for lc_fn in linear_constraint_fns:
+            constraints.append(lc_fn(full_names))
+
+    for obj, lb, ub in constraint_specs:
+        constraints.append(
+            optimizable_to_constraints(obj, lb, ub, full_names, prob=prob)
+        )
+
+    lb_arr, ub_arr = prob.bounds
+    return prob.x.copy(), fun, Bounds(lb_arr, ub_arr), constraints

@@ -16,9 +16,7 @@ from coil_fem.simsopt import (
     BeamCurveAngle,
     BeamCurveDistance,
     CoilFEMObjective,
-    constraint_from_optimizable
 )
-from simsopt._core.optimizable import Optimizable
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
 from simsopt import save
@@ -50,6 +48,7 @@ from opt_utils import (
     load_eq,
     ppp_for_target_quadpoints,
     increase_base_curve_order,
+    build_problem,
 )
 
 # Loading the W7-X standard configuration 
@@ -203,7 +202,6 @@ FLUX_NORM_TARGET = Jf_norm.J()
 Jcc = CurveCurveDistance(curves_for_ccd, CC_TARGET)
 Jcs = CurveSurfaceDistance(base_curves, plasma_surface, CP_TARGET)
 curv_objs = [LpCurveCurvature(c, Lp, threshold=CURVATURE_TARGET) for c in base_curves]
-cons_curvature = [constraint_from_optimizable(c, 0, 0) for c in curv_objs]
 
 # ----- Optimization -----
 
@@ -238,39 +236,27 @@ def _sum_dphis_constraint(dof_names):
         A[row, idxs] = 1.0
     return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
 
-# Since the curve dependencies are in the constraints,
-# not the objective, we create a dummy problem ti 
-# correctly transmit dofs.
-class Problem(Optimizable):
-    def __init__(self, *objs):
-        Optimizable.__init__(self, depends_on=list(objs))
-prob = Problem(Jstress, Jbsd, Jbca, Jbcd, Jf_norm, Jcc, Jcs, *curv_objs)
-
-def fun(dofs):
-    prob.x = dofs
-    return Jstress.J(), Jstress.dJ()
-
 # # Profiling
 # with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
 
-dofs = prob.x
-lb, ub = prob.bounds
-bounds = Bounds(lb, ub)
-constraints = [
-    _sum_dphis_constraint(Jstress.dof_names),
-    constraint_from_optimizable(Jbsd,    0, 0),
-    constraint_from_optimizable(Jbca,    0, 0),
-    constraint_from_optimizable(Jbcd,    0, 0),
-    constraint_from_optimizable(Jf_norm, 0, FLUX_NORM_TARGET),
-    constraint_from_optimizable(Jcc,     0, 0),
-    constraint_from_optimizable(Jcs,     0, 0),
-] + cons_curvature
+x0, fun, bounds, constraints = build_problem(
+    Jstress,
+    [
+        (Jbsd,    0, 0),
+        (Jbca,    0, 0),
+        (Jbcd,    0, 0),
+        (Jf_norm, 0, FLUX_NORM_TARGET),
+        (Jcc,     0, 0),
+        (Jcs,     0, 0),
+    ] + [(c, 0, 0) for c in curv_objs],
+    linear_constraint_fns=[_sum_dphis_constraint],
+)
 print("MAXITER =", MAXITER)
-print("# free dofs =", len(dofs))
+print("# free dofs =", len(x0))
 print("# linear inequality constraints =", constraints[0].A.shape[0])
 time_filament_1 = time.time()
 res = minimize(
-    fun, dofs, jac=True, method="trust-constr",
+    fun, x0, jac=True, method="trust-constr",
     bounds=bounds,
     constraints=constraints,
     options={
