@@ -1,0 +1,16 @@
+[gl018.hpc.nyu.edu:312591] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+2026-08-19 14:49:23.589820: E external/xla/xla/service/slow_operation_alarm.cc:73] 
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+2026-08-19 14:49:31.373479: E external/xla/xla/service/slow_operation_alarm.cc:140] The operation took 2m7.783898406s
+
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/equality_constrained_sqp.py:81: UserWarning: Singular Jacobian matrix. Using SVD decomposition to perform the factorizations.
+  Z, LS, Y = projections(A, factorization_method)
+/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/equality_constrained_sqp.py:217: UserWarning: Singular Jacobian matrix. Using SVD decomposition to perform the factorizations.
+  Z, LS, Y = projections(A, factorization_method)
+/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_differentiable_functions.py:552: UserWarning: delta_grad == 0.0. Check if the approximated function is linear. If the function is linear better results can be obtained by defining the Hessian as zero instead of using quasi-Newton approximations.
+  self.H.update(delta_x, delta_g)

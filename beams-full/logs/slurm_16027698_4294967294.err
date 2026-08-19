@@ -1,0 +1,26 @@
+[gl004.hpc.nyu.edu:275670] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+2026-08-19 13:11:39.856963: E external/xla/xla/service/slow_operation_alarm.cc:73] 
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+2026-08-19 13:12:03.217335: E external/xla/xla/service/slow_operation_alarm.cc:140] The operation took 2m23.360516591s
+
+********************************
+[Compiling module jit__weighted_J] Very slow compile? If you want to file a bug, run with envvar XLA_FLAGS=--xla_dump_to=/tmp/foo and attach the results.
+********************************
+Traceback (most recent call last):
+  File "/scratch/lf2869/project/fem-data/beams-full/./optimize_full.py", line 272, in <module>
+    res = minimize(
+          ^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_minimize.py", line 753, in minimize
+    res = _minimize_trustregion_constr(fun, x0, args, jac, hess, hessp,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/minimize_trustregion_constr.py", line 354, in _minimize_trustregion_constr
+    PreparedConstraint(c, x0, sparse_jacobian, finite_diff_bounds)
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_constraints.py", line 348, in __init__
+    fun = LinearVectorFunction(constraint.A, x0, sparse_jacobian)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_differentiable_functions.py", line 650, in __init__
+    self.f = self.J.dot(self.x)
+             ^^^^^^^^^^^^^^^^^^
+ValueError: shapes (12,315) and (419,) not aligned: 315 (dim 1) != 419 (dim 0)
