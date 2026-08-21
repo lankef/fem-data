@@ -182,33 +182,71 @@ for cur in base_currents:
 
 
 def _sum_dphis_constraint(dof_names):
-    """Linear inequalities sum_j dphis*[i][j] <= 1 for each coil/group.
+    """Linear inequalities on Sorted angle increments (attachment span).
 
-    Applies to free DOFs named ``dphis``, ``dphis_start_cc``,
-    ``dphis_end_cc``, ``dphis_start_cr``, and ``dphis_end_cr``.
+    Sorted encoding is ``phi[j] = cumsum(dphis)[j]``, so:
+
+    * ``sum_k dphis[k] = phi[-1]`` (absolute last angle),
+    * ``sum_{k>=1} dphis[k] = phi[-1] - phi[0]`` (span of the cluster).
+
+    This constraint bounds the **span**: for each free key and coil/group
+    index ``i``, ``sum_{j>=1} dphis*(i,j) <= ub`` (the first increment
+    ``j=0`` is excluded).
+
+    ``ub`` is ``1`` for coil-side / CC / CF / clamp keys.  For
+    ``dphis_end_cr`` (CSR attachment angles) it is one field period
+    (``1/nfp``), or half of that under stellarator symmetry
+    (``1/(2 nfp)``), matching the CSR sector CR ends attach to.
     """
-    keys = (
-        "dphis",
-        "dphis_start_cc", "dphis_end_cc",
-        "dphis_start_cf",
-        "dphis_start_cr", "dphis_end_cr",
-    )
-    groups = defaultdict(list)
-    for j, name in enumerate(dof_names):
-        # simsopt: "CoilSupportBeamsCSRSorted1:dphis_start_cc(0,3)"
+    nfp = int(coil_support.nfp)
+    stellsym = bool(coil_support.stellsym)
+    ub_end_cr = 1.0 / nfp / (2.0 if stellsym else 1.0)
+
+    # Keys we constrain, and their default span upper bound.
+    keys = {
+        "dphis": 1.0,
+        "dphis_start_cc": 1.0,
+        "dphis_end_cc": 1.0,
+        "dphis_start_cf": 1.0,
+        "dphis_start_cr": 1.0,
+        "dphis_end_cr": ub_end_cr,
+    }
+
+    # Group free DOFs by (key, coil_or_group_index).
+    # simsopt names look like: "CoilSupportBeamsCSRSorted1:dphis_end_cr(0,2)"
+    # → key="dphis_end_cr", i_coil=0, beam_j=2.
+    groups = defaultdict(list)  # (key, i_coil) -> [(dof_index, beam_j), ...]
+    for dof_index, name in enumerate(dof_names):
         local = name.split(":", 1)[-1]
-        key = local.split("(", 1)[0]
+        if "(" not in local:
+            continue
+        key, rest = local.split("(", 1)
         if key not in keys:
             continue
-        i_coil = int(local.split("(", 1)[1].split(",", 1)[0])
-        groups[(key, i_coil)].append(j)
+        # rest is e.g. "0,2)" or "0)" for 1-D leaves
+        idxs = rest.rstrip(")").split(",")
+        i_coil = int(idxs[0])
+        beam_j = int(idxs[1]) if len(idxs) > 1 else 0
+        groups[(key, i_coil)].append((dof_index, beam_j))
+
     n = len(dof_names)
-    if not groups:
+    rows = []
+    ub_list = []
+    for (key, _i_coil), entries in groups.items():
+        # Span = sum of increments after the first attachment.
+        idxs = [dof_index for dof_index, beam_j in entries if beam_j >= 1]
+        if not idxs:
+            continue  # only one beam → span is identically 0
+        rows.append(idxs)
+        ub_list.append(keys[key])
+
+    if not rows:
         return LinearConstraint(np.zeros((0, n)), -np.inf, np.zeros(0))
-    A = np.zeros((len(groups), n))
-    for row, idxs in enumerate(groups.values()):
+
+    A = np.zeros((len(rows), n))
+    for row, idxs in enumerate(rows):
         A[row, idxs] = 1.0
-    return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
+    return LinearConstraint(A, -np.inf, np.asarray(ub_list, dtype=float))
 
 
 # # Profiling
