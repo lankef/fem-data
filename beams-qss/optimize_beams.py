@@ -72,21 +72,10 @@ coil_per_half_fp = 5
 curves, currents, axis, nfp, bs = get_data(
     "w7x", 
     coil_order=8, 
-    points_per_period=12 # <<<<< SET RESOLUTION HERE
+    points_per_period=24 # 12 # <<<<< SET RESOLUTION HERE
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
-
-# ----- Optimization targets -----
-
-# Setting targets
-Jf_norm = SquaredFlux(
-    plasma_surface_vc,
-    bs,
-    target=Bnormal_plasma,
-    definition='normalized',
-)
-FLUX_NORM_TARGET = Jf_norm.J()
 
 # ----- FEM / support options -----
 
@@ -124,7 +113,7 @@ coil_support = CoilSupportBeamsSorted(
 # max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
 Jstress = CoilFEMObjective(
     coil_support,
-    metrics          = ("l2_von_mises",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+    metrics          = ("sq_max_von_mises_lse",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
     metric_weights   = (1.,),
     mesh_options     = mesh_options,
     material_options = material_options,

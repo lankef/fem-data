@@ -149,7 +149,7 @@ coil_support = CoilSupportBeamsSorted(
 # max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
 Jstress = CoilFEMObjective(
     coil_support,
-    metrics          = ("l2_von_mises",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+    metrics          = ("sq_max_von_mises_lse",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
     metric_weights   = (1.,),
     mesh_options     = mesh_options,
     material_options = material_options,
