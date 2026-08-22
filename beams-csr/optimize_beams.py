@@ -99,7 +99,7 @@ CSR_R = 9.0
 csr_options = {
     "order": CSR_ORDER,
     "w1": 0.3,   # width
-    "w2": 1.0,   # height
+    "w2": 0.5,   # height
     "n_phi": 32,
     "E": beam_options["E"],
     "nu": beam_options["nu"],
@@ -257,7 +257,7 @@ x0, fun, bounds, constraints = build_problem(
     [
         (Jbsd, 0, 0),
         (Jbca, 0, 0),
-        (Jbcd, 0, 0),
+        # (Jbcd, 0, 0),
         (Jvol, -np.inf, 9.0),
     ],
     linear_constraint_fns=[_sum_dphis_constraint],
