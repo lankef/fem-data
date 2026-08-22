@@ -93,9 +93,9 @@ beam_options["n_beam_cr"] = 2
 fixed_clamp_options = opts["fixed_clamp_options"]
 mesh_scale = 0.5
 
-# Circular CSR: R=9 m, section 0.3 x 1.0 m, Fourier order 2.
+# Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
 CSR_ORDER = 2
-CSR_R = 9.0
+CSR_R = 4.0
 csr_options = {
     "order": CSR_ORDER,
     "w1": 0.3,   # width
