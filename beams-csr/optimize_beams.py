@@ -8,7 +8,7 @@
 # Constrained variant: CoilSupportBeamsCSRSorted + scipy trust-constr
 # with box bounds from build_problem and linear inequalities
 # sum_j dphis*[i][j] <= 1 per coil/group for CC/CF/CR dphis*,
-# plus CSRVolume < 9.
+# plus CSRVolume < 9 and CSRCurveDistance == 0.
 
 from coil_fem.simsopt import (
     CoilSupportBeamsCSRSorted,
@@ -17,12 +17,14 @@ from coil_fem.simsopt import (
     BeamCurveDistance,
     CoilFEMObjective,
     CSRVolume,
+    CSRCurveDistance,
 )
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
 from simsopt.geo import CurveSurfaceDistance
 from simsopt import save
 import json
+import math
 import numpy as np
 import jax
 import time
@@ -171,6 +173,14 @@ Jbcd = BeamCurveDistance(
 
 Jvol = CSRVolume(coil_support)
 
+# ----- CSR–coil centreline distance -----
+
+dmin_csrcc = (
+    0.5 * math.hypot(csr_options["w1"], csr_options["w2"])
+    + 0.5 * math.hypot(mesh_options["w1"], mesh_options["w2"])
+)
+Jcsrcc = CSRCurveDistance(coil_support, dmin_csrcc)
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
@@ -184,14 +194,13 @@ for cur in base_currents:
 def _sum_dphis_constraint(dof_names):
     """Linear inequalities on Sorted angle increments (attachment span).
 
-    Sorted encoding is ``phi[j] = cumsum(dphis)[j]``, so:
+    Sorted encoding is ``phi = cumsum(dphis)`` along the increment axis, so
+    the sum of increments after the first is the span of the cluster.
 
-    * ``sum_k dphis[k] = phi[-1]`` (absolute last angle),
-    * ``sum_{k>=1} dphis[k] = phi[-1] - phi[0]`` (span of the cluster).
-
-    This constraint bounds the **span**: for each free key and coil/group
-    index ``i``, ``sum_{j>=1} dphis*(i,j) <= ub`` (the first increment
-    ``j=0`` is excluded).
+    Coil-side / CC / CF / clamp keys increment along the beam axis: for each
+    ``(key, i_coil)``, ``sum_{j>=1} dphis*(i,j) <= ub``.  ``dphis_end_cr``
+    increments along the coil axis: for each beam column ``j``,
+    ``sum_{i>=1} dphis_end_cr(i,j) <= ub_end_cr``.
 
     ``ub`` is ``1`` for coil-side / CC / CF / clamp keys.  For
     ``dphis_end_cr`` (CSR attachment angles) it is one field period
@@ -212,10 +221,12 @@ def _sum_dphis_constraint(dof_names):
         "dphis_end_cr": ub_end_cr,
     }
 
-    # Group free DOFs by (key, coil_or_group_index).
-    # simsopt names look like: "CoilSupportBeamsCSRSorted1:dphis_end_cr(0,2)"
+    # Group free DOFs.  simsopt names look like:
+    # "CoilSupportBeamsCSRSorted1:dphis_end_cr(0,2)"
     # → key="dphis_end_cr", i_coil=0, beam_j=2.
-    groups = defaultdict(list)  # (key, i_coil) -> [(dof_index, beam_j), ...]
+    # Coil-side keys group by (key, i_coil) and sum beam_j >= 1.
+    # dphis_end_cr groups by (key, beam_j) and sums i_coil >= 1.
+    groups = defaultdict(list)
     for dof_index, name in enumerate(dof_names):
         local = name.split(":", 1)[-1]
         if "(" not in local:
@@ -223,20 +234,24 @@ def _sum_dphis_constraint(dof_names):
         key, rest = local.split("(", 1)
         if key not in keys:
             continue
-        # rest is e.g. "0,2)" or "0)" for 1-D leaves
         idxs = rest.rstrip(")").split(",")
         i_coil = int(idxs[0])
         beam_j = int(idxs[1]) if len(idxs) > 1 else 0
-        groups[(key, i_coil)].append((dof_index, beam_j))
+        if key == "dphis_end_cr":
+            groups[(key, beam_j)].append((dof_index, i_coil))
+        else:
+            groups[(key, i_coil)].append((dof_index, beam_j))
 
     n = len(dof_names)
     rows = []
     ub_list = []
-    for (key, _i_coil), entries in groups.items():
-        # Span = sum of increments after the first attachment.
-        idxs = [dof_index for dof_index, beam_j in entries if beam_j >= 1]
+    for (key, _grp), entries in groups.items():
+        skip_first = 1  # exclude the first increment along the increment axis
+        idxs = [
+            dof_index for dof_index, along in entries if along >= skip_first
+        ]
         if not idxs:
-            continue  # only one beam → span is identically 0
+            continue  # only one increment → span is identically 0
         rows.append(idxs)
         ub_list.append(keys[key])
 
@@ -259,6 +274,7 @@ x0, fun, bounds, constraints = build_problem(
         (Jbca, 0, 0),
         # (Jbcd, 0, 0),
         (Jvol, -np.inf, 9.0),
+        (Jcsrcc, 0, 0),
     ],
     linear_constraint_fns=[_sum_dphis_constraint],
 )
