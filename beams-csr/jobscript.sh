@@ -9,7 +9,6 @@
 
 
 mkdir -p logs
-
 module load anaconda3/2025.06
 source $(conda info --base)/etc/profile.d/conda.sh
 export PETSC_OPTIONS="-no_signal_handler"

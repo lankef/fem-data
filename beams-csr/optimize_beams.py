@@ -6,9 +6,11 @@
 # can cause coils to converge prematurely.
 #
 # Constrained variant: CoilSupportBeamsCSRSorted + scipy trust-constr
-# with box bounds from build_problem and linear inequalities
-# sum_j dphis*[i][j] <= 1 per coil/group for CC/CF/CR dphis*,
-# plus CSRVolume < 9 and CSRCurveDistance == 0.
+# with box bounds from build_problem and linear span inequalities:
+# coil-side / CC / CF / start_cr sum beam increments after the first
+# (per coil/group, ub=1); dphis_end_cr sums coil increments after the
+# first (per beam column, ub=one CSR sector). Plus CSRVolume < 9,
+# CSRCurveDistance == 0, and CSRSurfaceDistance == 0.
 
 from coil_fem.simsopt import (
     CoilSupportBeamsCSRSorted,
@@ -18,6 +20,7 @@ from coil_fem.simsopt import (
     CoilFEMObjective,
     CSRVolume,
     CSRCurveDistance,
+    CSRSurfaceDistance,
 )
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
@@ -181,6 +184,11 @@ dmin_csrcc = (
 )
 Jcsrcc = CSRCurveDistance(coil_support, dmin_csrcc)
 
+# ----- CSR–plasma surface distance -----
+
+dmin_csrs = 0.5 * math.hypot(csr_options["w1"], csr_options["w2"])
+Jcsrs = CSRSurfaceDistance(coil_support, plasma_surface, dmin_csrs)
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
@@ -275,6 +283,7 @@ x0, fun, bounds, constraints = build_problem(
         # (Jbcd, 0, 0),
         (Jvol, -np.inf, 9.0),
         (Jcsrcc, 0, 0),
+        (Jcsrs, 0, 0),
     ],
     linear_constraint_fns=[_sum_dphis_constraint],
 )
