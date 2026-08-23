@@ -51,8 +51,8 @@ eq = Vmec("../fixed-continuation/wout.nc", keep_all_files=True)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
-MAXITER = 1000
-MAXFUN = 10000
+MAXITER = 5000
+MAXFUN = 50000
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -80,7 +80,7 @@ coil_per_half_fp = 5
 curves, currents, axis, nfp, bs = get_data(
     "w7x",
     coil_order=8,
-    points_per_period=12 # <<<<< SET RESOLUTION HERE
+    points_per_period=24 # <<<<< SET RESOLUTION HERE
 )
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
@@ -110,7 +110,7 @@ csr_options = {
     "order": csr_order,
     "w1": 0.3,   # width
     "w2": 0.5,   # height
-    "n_phi": 32,
+    "n_phi": 64,
     "E": beam_options["E"],
     "nu": beam_options["nu"],
 }
@@ -140,7 +140,7 @@ coil_support = CoilSupportBeamsCSRSorted(
 # max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
 Jstress = CoilFEMObjective(
     coil_support,
-    metrics          = ("l2_von_mises",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+    metrics          = ("sq_max_von_mises_lse"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
     metric_weights   = (1.,),
     mesh_options     = mesh_options,
     material_options = material_options,
@@ -285,7 +285,7 @@ x0, fun, bounds, constraints = build_problem(
     [
         (Jbsd, 0, 0),
         (Jbca, 0, 0),
-        # (Jbcd, 0, 0),
+        (Jbcd, 0, 0),
         (Jvol, -np.inf, 9.0),
         (Jcsrcc, 0, 0),
         (Jcsrs, 0, 0),
@@ -303,7 +303,7 @@ res = minimize(
     constraints=constraints,
     options={
         "maxiter": MAXITER,
-        "gtol": 1e-5,
+        "gtol": 1e-3,
         "xtol": 1e-5,
         "barrier_tol": 1e-5,
         "verbose": 2,
