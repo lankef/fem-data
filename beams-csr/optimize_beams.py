@@ -60,6 +60,7 @@ plasma_surface = type(eq.boundary)(
     quadpoints_theta=np.linspace(0, 1, n_theta, endpoint=False),
 )
 plasma_surface.set_dofs(eq.boundary.get_dofs())
+
 r_beam = 0.08
 # Orientations and beam radius fixed; csr_curve_dofs left free for volume.
 fixed_dof_names = [
@@ -84,6 +85,10 @@ curves, currents, axis, nfp, bs = get_data(
 base_curves = curves[:coil_per_half_fp]
 base_currents = currents[:coil_per_half_fp]
 
+# Coil-surface distance
+Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
+dmin_cp = Jcsdist_init.shortest_distance()
+
 # ----- FEM / support options -----
 
 _OPTIONS_PATH = Path(__file__).resolve().parent.parent / "beam-options.json"
@@ -99,10 +104,10 @@ fixed_clamp_options = opts["fixed_clamp_options"]
 mesh_scale = 0.5
 
 # Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
-CSR_ORDER = 2
-CSR_R = 4.0
+csr_order = 2
+csr_r = 3.5
 csr_options = {
-    "order": CSR_ORDER,
+    "order": csr_order,
     "w1": 0.3,   # width
     "w2": 0.5,   # height
     "n_phi": 32,
@@ -110,8 +115,8 @@ csr_options = {
     "nu": beam_options["nu"],
 }
 # stellsym CurveRZFourier: 2*order+1 DOFs; circle = rc0=R
-csr_curve_dofs = np.zeros(2 * CSR_ORDER + 1)
-csr_curve_dofs[0] = CSR_R
+csr_curve_dofs = np.zeros(2 * csr_order + 1)
+csr_curve_dofs[0] = csr_r
 
 # ----- Defining optimizable -----
 
@@ -186,7 +191,7 @@ Jcsrcc = CSRCurveDistance(coil_support, dmin_csrcc)
 
 # ----- CSR–plasma surface distance -----
 
-dmin_csrs = 0.5 * math.hypot(csr_options["w1"], csr_options["w2"])
+dmin_csrs = dmin_csrcc + dmin_cp
 Jcsrs = CSRSurfaceDistance(coil_support, plasma_surface, dmin_csrs)
 
 # ----- Optimization -----
