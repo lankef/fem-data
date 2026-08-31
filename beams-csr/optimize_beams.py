@@ -165,7 +165,7 @@ Jbsd = BeamSurfaceDistance(coil_support, plasma_surface, min_csd * 0.9)
 # ----- Beam-curve angle -----
 
 Jbca = BeamCurveAngle(
-    coil_support, minimum_angle=np.pi/6, mode="all"
+    coil_support, minimum_angle=np.pi/8, mode="all"
 )
 
 # ----- Beam-curve distance
