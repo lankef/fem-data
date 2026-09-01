@@ -29,10 +29,16 @@ import jax
 import time
 import json
 import pickle
+import sys
 from collections import defaultdict
 from pathlib import Path
 from simsopt.field import Coil
 from scipy.optimize import minimize, Bounds, LinearConstraint
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from shared import inboard_clamp_phis
 
 # Loading the W7-X standard configuration 
 # plasma surface. wout file comes from Landreman"s
@@ -96,6 +102,7 @@ mesh_scale = 0.5
 
 # One support object covers the whole base coilset
 base_coils = [Coil(c, I) for c, I in zip(base_curves, base_currents)]
+dphis_clamp = inboard_clamp_phis(base_coils)
 coil_support = CoilSupportBeamsSorted(
     base_coils=base_coils,
     nfp=eq.boundary.nfp,
@@ -106,6 +113,7 @@ coil_support = CoilSupportBeamsSorted(
     # t_beam=t_beam,
     r_beam=r_beam,
     fixed_clamp_options=fixed_clamp_options,
+    dphis=dphis_clamp,
     fixed_dof_names=fixed_dof_names,
 )
 
