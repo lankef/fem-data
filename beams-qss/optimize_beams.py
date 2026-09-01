@@ -214,10 +214,10 @@ lb, ub = Jstress.bounds
 bounds = Bounds(lb, ub)
 constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
-    constraint_from_optimizable(Jbsd, 0, 0),
-    constraint_from_optimizable(Jbca, 0, 0),
-    constraint_from_optimizable(Jbcd, 0, 0),
-    constraint_from_optimizable(Jclamp, 0, 0),
+    constraint_from_optimizable(Jbsd, -np.inf, 0),
+    constraint_from_optimizable(Jbca, -np.inf, 0),
+    constraint_from_optimizable(Jbcd, -np.inf, 0),
+    constraint_from_optimizable(Jclamp, -np.inf, 0),
 ]
 print("MAXITER =", MAXITER)
 print("# free dofs =", len(dofs))
