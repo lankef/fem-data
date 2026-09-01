@@ -15,6 +15,7 @@ from coil_fem.simsopt import (
     BeamSurfaceDistance, 
     BeamCurveAngle,
     BeamCurveDistance,
+    ClampInboard,
     CoilFEMObjective,
     constraint_from_optimizable
 )
@@ -104,7 +105,7 @@ coil_support = CoilSupportBeamsSorted(
     # w2_beam=w2_beam,
     # t_beam=t_beam,
     r_beam=r_beam,
-    fixed_clamp_options={"enabled": False}, # fixed_clamp_options,
+    fixed_clamp_options=fixed_clamp_options,
     fixed_dof_names=fixed_dof_names,
 )
 
@@ -150,6 +151,11 @@ Jbcd = BeamCurveDistance(
     dead_length=target_bcd*2,
     minimum_distance=target_bcd*0.9,
 )
+
+# ----- Clamp inboard -----
+# Push fixed clamps radially inboard of each coil centre (J == 0).
+
+Jclamp = ClampInboard(coil_support)
 
 # ----- Optimization -----
 
@@ -202,7 +208,8 @@ constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
     constraint_from_optimizable(Jbsd, 0, 0),
     constraint_from_optimizable(Jbca, 0, 0),
-    constraint_from_optimizable(Jbcd, 0, 0)
+    constraint_from_optimizable(Jbcd, 0, 0),
+    constraint_from_optimizable(Jclamp, 0, 0),
 ]
 print("MAXITER =", MAXITER)
 print("# free dofs =", len(dofs))
