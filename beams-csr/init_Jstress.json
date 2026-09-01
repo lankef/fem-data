@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "22835890628048": {
+    "22647036356048": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890628048",
+      "@name": "22647036356048",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -507,13 +507,13 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "22835890628048"
+        "value": "22647036356048"
       }
     },
-    "22835890856080": {
+    "22647036567696": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890856080",
+      "@name": "22647036567696",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -559,7 +559,7 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "22835890856080"
+        "value": "22647036567696"
       }
     },
     "Coil71": {
@@ -576,10 +576,10 @@
         "value": "Current1"
       }
     },
-    "22835890629488": {
+    "22647036357488": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890629488",
+      "@name": "22647036357488",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1074,7 +1074,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "22835890629488"
+        "value": "22647036357488"
       }
     },
     "Coil72": {
@@ -1091,10 +1091,10 @@
         "value": "Current1"
       }
     },
-    "22835890632464": {
+    "22647036360464": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890632464",
+      "@name": "22647036360464",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1589,7 +1589,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "22835890632464"
+        "value": "22647036360464"
       }
     },
     "Coil73": {
@@ -1606,10 +1606,10 @@
         "value": "Current1"
       }
     },
-    "22835890853488": {
+    "22647036565104": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890853488",
+      "@name": "22647036565104",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2104,7 +2104,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "22835890853488"
+        "value": "22647036565104"
       }
     },
     "Coil74": {
@@ -2121,10 +2121,10 @@
         "value": "Current1"
       }
     },
-    "22835890854160": {
+    "22647036565776": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22835890854160",
+      "@name": "22647036565776",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2619,7 +2619,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "22835890854160"
+        "value": "22647036565776"
       }
     },
     "Coil75": {
@@ -2636,10 +2636,10 @@
         "value": "Current1"
       }
     },
-    "22832454537712": {
+    "22640970285424": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22832454537712",
+      "@name": "22640970285424",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2649,8 +2649,6 @@
           3.5,
           0.0,
           0.0,
-          0.0,
-          0.0,
           0.08333333333333337,
           0.16666666666666669,
           0.16666666666666663,
@@ -2682,15 +2680,10 @@
           0.16666666666666663,
           0.16666666666666663,
           0.009233959283279247,
-          0.009233959283279247,
-          0.018514431547823042,
           0.018514431547823042,
           0.019107270588921543,
-          0.019107270588921543,
-          0.020625832690100758,
           0.020625832690100758,
           0.021741026141975747,
-          0.021741026141975747,
           0.08333333333333337,
           0.16666666666666669,
           0.16666666666666663,
@@ -2721,16 +2714,11 @@
           0.08333333333333337,
           0.16666666666666669,
           0.16666666666666663,
-          0.3197916666666667,
-          0.09999999999999998,
-          0.3510416666666667,
-          0.09999999999999998,
-          0.3666666666666667,
-          0.09999999999999998,
-          0.3927083333333333,
-          0.09999999999999998,
-          0.4291666666666667,
-          0.10000000000000003,
+          0.36979166666666663,
+          0.40104166666666663,
+          0.41666666666666663,
+          0.44270833333333326,
+          0.47916666666666663,
           0.08,
           0.08,
           0.08,
@@ -2766,16 +2754,6 @@
           0.08,
           0.08,
           0.08,
-          0.08,
-          0.08,
-          0.08,
-          0.08,
-          0.08,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
           0.0,
           0.0,
           0.0,
@@ -2817,8 +2795,6 @@
         "csr_curve_dofs(0)",
         "csr_curve_dofs(1)",
         "csr_curve_dofs(2)",
-        "csr_curve_dofs(3)",
-        "csr_curve_dofs(4)",
         "dphis_end_cc(0,0)",
         "dphis_end_cc(0,1)",
         "dphis_end_cc(0,2)",
@@ -2850,15 +2826,10 @@
         "dphis_end_cc(5,1)",
         "dphis_end_cc(5,2)",
         "dphis_end_cr(0,0)",
-        "dphis_end_cr(0,1)",
         "dphis_end_cr(1,0)",
-        "dphis_end_cr(1,1)",
         "dphis_end_cr(2,0)",
-        "dphis_end_cr(2,1)",
         "dphis_end_cr(3,0)",
-        "dphis_end_cr(3,1)",
         "dphis_end_cr(4,0)",
-        "dphis_end_cr(4,1)",
         "dphis_start_cc(0,0)",
         "dphis_start_cc(0,1)",
         "dphis_start_cc(0,2)",
@@ -2890,15 +2861,10 @@
         "dphis_start_cc(5,1)",
         "dphis_start_cc(5,2)",
         "dphis_start_cr(0,0)",
-        "dphis_start_cr(0,1)",
         "dphis_start_cr(1,0)",
-        "dphis_start_cr(1,1)",
         "dphis_start_cr(2,0)",
-        "dphis_start_cr(2,1)",
         "dphis_start_cr(3,0)",
-        "dphis_start_cr(3,1)",
         "dphis_start_cr(4,0)",
-        "dphis_start_cr(4,1)",
         "r_beam(0,0)",
         "r_beam(0,1)",
         "r_beam(0,2)",
@@ -2906,7 +2872,6 @@
         "r_beam(0,4)",
         "r_beam(0,5)",
         "r_beam(0,6)",
-        "r_beam(0,7)",
         "r_beam(1,0)",
         "r_beam(1,1)",
         "r_beam(1,2)",
@@ -2914,7 +2879,6 @@
         "r_beam(1,4)",
         "r_beam(1,5)",
         "r_beam(1,6)",
-        "r_beam(1,7)",
         "r_beam(2,0)",
         "r_beam(2,1)",
         "r_beam(2,2)",
@@ -2922,7 +2886,6 @@
         "r_beam(2,4)",
         "r_beam(2,5)",
         "r_beam(2,6)",
-        "r_beam(2,7)",
         "r_beam(3,0)",
         "r_beam(3,1)",
         "r_beam(3,2)",
@@ -2930,12 +2893,10 @@
         "r_beam(3,4)",
         "r_beam(3,5)",
         "r_beam(3,6)",
-        "r_beam(3,7)",
         "r_beam(4,0)",
         "r_beam(4,1)",
         "r_beam(4,2)",
         "r_beam(4,3)",
-        "r_beam(4,4)",
         "r_beam(5,0)",
         "r_beam(5,1)",
         "r_beam(5,2)",
@@ -2970,15 +2931,10 @@
         "thetas_orientation_cc(5,1)",
         "thetas_orientation_cc(5,2)",
         "thetas_orientation_cr(0,0)",
-        "thetas_orientation_cr(0,1)",
         "thetas_orientation_cr(1,0)",
-        "thetas_orientation_cr(1,1)",
         "thetas_orientation_cr(2,0)",
-        "thetas_orientation_cr(2,1)",
         "thetas_orientation_cr(3,0)",
-        "thetas_orientation_cr(3,1)",
-        "thetas_orientation_cr(4,0)",
-        "thetas_orientation_cr(4,1)"
+        "thetas_orientation_cr(4,0)"
       ],
       "free": {
         "@module": "numpy",
@@ -3058,28 +3014,6 @@
           true,
           true,
           true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          false,
-          false,
-          false,
-          false,
-          false,
-          false,
-          false,
-          false,
-          false,
-          false,
           false,
           false,
           false,
@@ -3160,8 +3094,6 @@
           -Infinity,
           -Infinity,
           -Infinity,
-          -Infinity,
-          -Infinity,
           -0.5,
           0.0,
           0.0,
@@ -3193,11 +3125,6 @@
           0.0,
           0.0,
           -0.05,
-          -0.05,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
           0.0,
           0.0,
           0.0,
@@ -3233,25 +3160,10 @@
           0.0,
           0.0,
           -0.5,
-          0.0,
           -0.5,
-          0.0,
           -0.5,
-          0.0,
           -0.5,
-          0.0,
           -0.5,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
-          0.0,
           0.0,
           0.0,
           0.0,
@@ -3332,8 +3244,6 @@
           Infinity,
           Infinity,
           Infinity,
-          Infinity,
-          Infinity,
           0.5,
           1.0,
           1.0,
@@ -3365,11 +3275,6 @@
           1.0,
           1.0,
           0.05,
-          0.05,
-          0.1,
-          0.1,
-          0.1,
-          0.1,
           0.1,
           0.1,
           0.1,
@@ -3405,15 +3310,10 @@
           1.0,
           1.0,
           0.5,
-          1.0,
           0.5,
-          1.0,
           0.5,
-          1.0,
           0.5,
-          1.0,
           0.5,
-          1.0,
           Infinity,
           Infinity,
           Infinity,
@@ -3449,16 +3349,6 @@
           Infinity,
           Infinity,
           Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          Infinity,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
-          1.0,
           1.0,
           1.0,
           1.0,
@@ -3534,11 +3424,11 @@
         "nu": 0.3,
         "cross_section_type": "solid_circle",
         "attachment_type": "direct",
-        "n_beam_cr": 2,
+        "n_beam_cr": 1,
         "k_attachment": 279557558559452.25
       },
       "csr_options": {
-        "order": 2,
+        "order": 1,
         "w1": 0.3,
         "w2": 0.5,
         "n_phi": 64,
@@ -3565,8 +3455,6 @@
         "data": [
           3.5,
           0.0,
-          0.0,
-          0.0,
           0.0
         ]
       },
@@ -3583,7 +3471,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "22832454537712"
+        "value": "22640970285424"
       },
       "r_beam": 0.08
     },

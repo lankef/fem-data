@@ -2,7 +2,7 @@
 #SBATCH --account=torch_pr_292_courant
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=100G
-#SBATCH --time=04:00:00
+#SBATCH --time=05:00:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
 #SBATCH --gres=gpu:l40s:1

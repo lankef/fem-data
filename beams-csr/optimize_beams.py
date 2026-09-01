@@ -51,8 +51,8 @@ eq = Vmec("../fixed-continuation/wout.nc", keep_all_files=True)
 # Adjusting resolution and taking a half-field-period
 n_phi = 25
 n_theta = 50
-MAXITER = 5000
-MAXFUN = 50000
+MAXITER = 2000
+MAXFUN = 20000
 plasma_surface = type(eq.boundary)(
     nfp=eq.boundary.nfp, stellsym=eq.boundary.stellsym,
     mpol=eq.boundary.mpol, ntor=eq.boundary.ntor,
@@ -99,12 +99,12 @@ gravity_options = opts["gravity_options"]
 problem_options = opts["problem_options"]
 physics_options = opts["physics_options"]
 beam_options = opts["beam_options"]
-beam_options["n_beam_cr"] = 2
+beam_options["n_beam_cr"] = 1
 fixed_clamp_options = opts["fixed_clamp_options"]
 mesh_scale = 0.5
 
 # Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
-csr_order = 2
+csr_order = 1 # 2
 csr_r = 3.5
 csr_options = {
     "order": csr_order,
@@ -165,7 +165,7 @@ Jbsd = BeamSurfaceDistance(coil_support, plasma_surface, min_csd * 0.9)
 # ----- Beam-curve angle -----
 
 Jbca = BeamCurveAngle(
-    coil_support, minimum_angle=np.pi/6, mode="all"
+    coil_support, minimum_angle=np.pi/8, mode="all"
 )
 
 # ----- Beam-curve distance
@@ -283,12 +283,12 @@ def _sum_dphis_constraint(dof_names):
 x0, fun, bounds, constraints = build_problem(
     Jstress,
     [
-        (Jbsd, 0, 0),
-        (Jbca, 0, 0),
-        (Jbcd, 0, 0),
-        (Jvol, -np.inf, 9.0),
-        (Jcsrcc, 0, 0),
-        (Jcsrs, 0, 0),
+        (Jbsd,   -np.inf, 0),
+        (Jbca,   -np.inf, 0),
+        # (Jbcd, 0, 0),
+        (Jvol,   -np.inf, 9.0),
+        (Jcsrcc, -np.inf, 0),
+        (Jcsrs,  -np.inf, 0),
     ],
     linear_constraint_fns=[_sum_dphis_constraint],
 )
