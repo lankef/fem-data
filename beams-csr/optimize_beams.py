@@ -25,7 +25,7 @@ from coil_fem.simsopt import (
 from simsopt.configs import get_data
 from simsopt.mhd import Vmec
 from simsopt.geo import CurveSurfaceDistance
-from simsopt import save
+from simsopt import save, load
 import json
 import math
 import numpy as np
@@ -72,18 +72,22 @@ fixed_dof_names = [
 
 # Loading the W7-X coils.
 coil_per_half_fp = 5
+# Cold start init state
 # The number of quadpoints here controls the mesh
 # density in coil-fem. The meshing routine will
 # try choose the cell number in the cross section
 # to make the aspect ratio close to one. Please see
 # the next sections for details.
-curves, currents, axis, nfp, bs = get_data(
-    "w7x",
-    coil_order=8,
-    points_per_period=24 # <<<<< SET RESOLUTION HERE
-)
-base_curves = curves[:coil_per_half_fp]
-base_currents = currents[:coil_per_half_fp]
+# curves, currents, axis, nfp, bs = get_data(
+#     "w7x",
+#     coil_order=8,
+#     points_per_period=24 # <<<<< SET RESOLUTION HERE
+# )
+# base_curves = curves[:coil_per_half_fp]
+# base_currents = currents[:coil_per_half_fp]
+Jstress = load('../beams-qss/Jstress_csr.json')[0]
+base_curves = Jstress._coil_support.base_curves
+base_currents = Jstress._coil_support.base_currents
 
 # Coil-surface distance
 Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
@@ -138,17 +142,17 @@ coil_support = CoilSupportBeamsCSRSorted(
 # The Simsopt wrapper for a differentiable FEM problem.
 # It behaves like a simsopt objective.
 # max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
-Jstress = CoilFEMObjective(
-    coil_support,
-    metrics          = ("sq_max_von_mises_lse"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
-    metric_weights   = (1.,),
-    mesh_options     = mesh_options,
-    material_options = material_options,
-    gravity_options  = gravity_options,
-    problem_options  = problem_options,
-    physics_options  = physics_options,
-    coupling         = "monolithic",
-)
+# Jstress = CoilFEMObjective(
+#     coil_support,
+#     metrics          = ("sq_max_von_mises_lse"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+#     metric_weights   = (1.,),
+#     mesh_options     = mesh_options,
+#     material_options = material_options,
+#     gravity_options  = gravity_options,
+#     problem_options  = problem_options,
+#     physics_options  = physics_options,
+#     coupling         = "monolithic",
+# )
 save([Jstress], "init_Jstress.json")
 Jstress.save_run_vtu("init_run")
 with open("init_summary.json", "w") as fp:
