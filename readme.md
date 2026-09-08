@@ -6,6 +6,9 @@ This is the coil stress optimization dataset.
 - `fixed-convergence`: The benchmark runs with fixed clamps. To re-run, execute `submit.sh` and `submit_petsc.sh`.
 - `fixed-continuation`: The optimization runs with fixed clamps. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
 - `fixed-optimization`: The optimization runs with fixed clamps, using w7x coils as the initial conditions. Not included in the manuscript. To re-run, run `sbatch jobscript.sh` and `sbatch jobscript_force.sh`.
+- `beams-cc`: W7X optimization with only coil-coil beams
+- `beams-full`: W7X optimization with coil-coil beams and movable coils
+- `beams-csr`: W7X optimization with central support ring
 - `beams-remat`: Demonstrating the effectiveness of rematerialization in the cuDSS backend.
 - `beams-profiling`: Seeing how big of a problem an L40s can fit.
 - `figures`: The figures.
