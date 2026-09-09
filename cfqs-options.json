@@ -1,8 +1,8 @@
 {
   "mesh_options": {
     "shape": "rect",
-    "w1": 0.069,
-    "w2": 0.132,
+    "w1": 0.132,
+    "w2": 0.069,
     "frame": "centroid",
     "aspect_ratio": 1.0,
     "mesh_type": "TET10",

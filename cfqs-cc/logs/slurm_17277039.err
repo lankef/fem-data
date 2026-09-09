@@ -1,0 +1,33 @@
+[gl021.hpc.nyu.edu:3168858] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+/scratch/lf2869/code/coil-fem/src/coil_fem/simsopt/coil_support_beams.py:293: UserWarning: Unrecognized keys in beam_options: ['comment'].
+  warnings.warn(
+Traceback (most recent call last):
+  File "/scratch/lf2869/project/fem-data/cfqs-cc/./optimize_beams.py", line 177, in <module>
+    res = minimize(
+          ^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_minimize.py", line 753, in minimize
+    res = _minimize_trustregion_constr(fun, x0, args, jac, hess, hessp,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/minimize_trustregion_constr.py", line 536, in _minimize_trustregion_constr
+    _, result = tr_interior_point(
+                ^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/tr_interior_point.py", line 336, in tr_interior_point
+    z, state = equality_constrained_sqp(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/equality_constrained_sqp.py", line 93, in equality_constrained_sqp
+    raise e
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/equality_constrained_sqp.py", line 81, in equality_constrained_sqp
+    Z, LS, Y = projections(A, factorization_method)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/projections.py", line 398, in projections
+    = qr_factorization_projections(A, m, n, orth_tol, max_refin, tol)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_trustregion_constr/projections.py", line 179, in qr_factorization_projections
+    Q, R, P = scipy.linalg.qr(A.T, pivoting=True, mode='economic')
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/linalg/_decomp_qr.py", line 140, in qr
+    a1 = np.asarray_chkfinite(a)
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py", line 646, in asarray_chkfinite
+    raise ValueError(
+ValueError: array must not contain infs or NaNs
