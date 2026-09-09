@@ -35,7 +35,7 @@
     "comment": "Table 4 in Xiong 2020"
   },
   "fixed_clamp_options": {
-    "enabled": true,
+    "enabled": false,
     "r_clamp": 0.173,
     "n_clamp": 0,
     "E_coil": 100000000000.0

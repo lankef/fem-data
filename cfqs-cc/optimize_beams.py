@@ -7,7 +7,7 @@
 #
 # Constrained variant: CoilSupportBeamsSorted + scipy trust-constr
 # with box bounds from Jstress.bounds and linear inequalities
-# sum_j dphis*[i][j] <= 1 per coil/group for dphis, dphis_start_cc,
+# sum_j dphis*[i][j] <= 1 per coil/group for dphis_start_cc
 # and dphis_end_cc.
 
 from coil_fem.simsopt import (
@@ -15,61 +15,42 @@ from coil_fem.simsopt import (
     BeamSurfaceDistance, 
     BeamCurveAngle,
     BeamCurveDistance,
-    ClampInboard,
     CoilFEMObjective,
     constraint_from_optimizable
 )
-from simsopt.configs import get_data
-from simsopt.mhd import Vmec
 from simsopt.geo import CurveSurfaceDistance
 from simsopt import save, load
 import json
 import numpy as np
-import jax
 import time
-import json
 import pickle
-import sys
 from collections import defaultdict
 from pathlib import Path
-from simsopt.field import Coil
 from scipy.optimize import minimize, Bounds, LinearConstraint
 
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-from shared import inboard_clamp_phis
-
 MAXITER = 1000
-MAXFUN = 10000
-r_beam = 0.08
 
-cfqs_dict = load('../cfqs-data/cfqs_data.json')
+_ROOT = Path(__file__).resolve().parent.parent
+cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
-n_phi = len(plasma_surface.quadpoints_phi)
-n_theta = len(plasma_surface.quadpoints_theta)
 
 # Setting beam parameters
 w1_beam = 0.05
 w2_beam = 0.1
-# t_beam = 0.03
 fixed_dof_names = [
     # "thetas_orientation_cc",
     "w1_beam",
     "w2_beam",
-    # "t_beam",
-    # "r_beam"
 ]
 
 # Loading the coils.
 base_coils = cfqs_dict['base_coils']
-coil_per_half_fp = len(base_coils)
 base_curves = [c.curve for c in base_coils]
 base_currents = [c.current for c in base_coils]
 
 # ----- FEM / support options -----
 
-_OPTIONS_PATH = Path(__file__).resolve().parent.parent / "cfqs-options.json"
+_OPTIONS_PATH = _ROOT / "cfqs-options.json"
 opts = json.load(open(_OPTIONS_PATH))
 mesh_options = opts["mesh_options"]
 material_options = opts["material_options"]
@@ -79,12 +60,10 @@ physics_options = opts["physics_options"]
 beam_options = opts["beam_options"]
 # beam_options["cross_section_type"] = "hollow_rectangle"
 fixed_clamp_options = opts["fixed_clamp_options"]
-mesh_scale = 0.5
 
 # ----- Defining optimizable ----- 
 
 # One support object covers the whole base coilset
-dphis_clamp = inboard_clamp_phis(base_coils)
 coil_support = CoilSupportBeamsSorted(
     base_coils=base_coils,
     nfp=plasma_surface.nfp,
@@ -92,10 +71,7 @@ coil_support = CoilSupportBeamsSorted(
     beam_options=beam_options,
     w1_beam=w1_beam,
     w2_beam=w2_beam,
-    # t_beam=t_beam,
-    # r_beam=r_beam,
     fixed_clamp_options=fixed_clamp_options,
-    dphis=dphis_clamp,
     fixed_dof_names=fixed_dof_names,
 )
 
@@ -134,18 +110,15 @@ Jbca = BeamCurveAngle(
 
 # ----- Beam-curve distance
 
-target_bcd = r_beam + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
-# target_bcd = np.sqrt(w1_beam**2 + w2_beam**2) + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
+target_bcd = (
+    np.sqrt(w1_beam**2 + w2_beam**2)
+    + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
+)
 Jbcd = BeamCurveDistance(
     coil_support, 
     dead_length=target_bcd*2,
     minimum_distance=target_bcd*0.9,
 )
-
-# ----- Clamp inboard -----
-# Push fixed clamps radially inboard of each coil centre (J == 0).
-
-Jclamp = ClampInboard(coil_support)
 
 # ----- Optimization -----
 
@@ -166,10 +139,10 @@ def fun(dofs):
 def _sum_dphis_constraint(dof_names):
     """Linear inequalities sum_j dphis*[i][j] <= 1 for each coil/group.
 
-    Applies to free DOFs named ``dphis``, ``dphis_start_cc``, and
-    ``dphis_end_cc`` (simsopt names like ``...:dphis_start_cc(i,j)``).
+    Applies to free DOFs named ``dphis_start_cc`` and ``dphis_end_cc``
+    (simsopt names like ``...:dphis_start_cc(i,j)``).
     """
-    keys = ("dphis", "dphis_start_cc", "dphis_end_cc")
+    keys = ("dphis_start_cc", "dphis_end_cc")
     groups = defaultdict(list)
     for j, name in enumerate(dof_names):
         # simsopt: "CoilSupportBeamsSorted1:dphis_start_cc(0,3)"
@@ -188,9 +161,6 @@ def _sum_dphis_constraint(dof_names):
     return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
 
 
-# # Profiling
-# with jax.profiler.trace("/tmp/jax-trace", create_perfetto_link=True):
-
 dofs = Jstress.x
 lb, ub = Jstress.bounds
 bounds = Bounds(lb, ub)
@@ -199,7 +169,6 @@ constraints = [
     constraint_from_optimizable(Jbsd, -np.inf, 0),
     constraint_from_optimizable(Jbca, -np.inf, 0),
     constraint_from_optimizable(Jbcd, -np.inf, 0),
-    constraint_from_optimizable(Jclamp, -np.inf, 0),
 ]
 print("MAXITER =", MAXITER)
 print("# free dofs =", len(dofs))
@@ -231,4 +200,3 @@ with open("fin_results.pkl", "wb") as file:
 with open("fin_summary.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
-
