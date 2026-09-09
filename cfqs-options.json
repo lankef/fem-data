@@ -1,0 +1,43 @@
+{
+  "mesh_options": {
+    "shape": "rect",
+    "w1": 0.069,
+    "w2": 0.132,
+    "frame": "centroid",
+    "aspect_ratio": 1.0,
+    "mesh_type": "TET10",
+    "comment": "Fig. 11 c in Xiong 2020"
+  },
+  "material_options": {
+    "E": 100000000000.0,
+    "nu": 0.34,
+    "density": 0.0,
+    "itc": 0.0,
+    "comment": "Table 4 in Xiong 2020"
+  },
+  "gravity_options": {
+    "g_vec": [0.0, 0.0, 0.0]
+  },
+  "problem_options": {
+    "solver": "cudss",
+    "adjoint_solver": "cudss"
+  },
+  "physics_options": {
+    "type": "elastic"
+  },
+  "beam_options": {
+    "n_beam_cc": 4,
+    "n_beam_cf": 0,
+    "E": 197000000000.0,
+    "nu": 0.3,
+    "cross_section_type": "solid_rectangle",
+    "attachment_type": "direct",
+    "comment": "Table 4 in Xiong 2020"
+  },
+  "fixed_clamp_options": {
+    "enabled": true,
+    "r_clamp": 0.173,
+    "n_clamp": 0,
+    "E_coil": 100000000000.0
+  }
+}
