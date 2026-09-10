@@ -181,26 +181,24 @@
   },
   "stacked_qr": {
     "shape": [
-      13,
+      12,
       48
     ],
-    "n_nan": 4,
+    "n_nan": 0,
     "n_inf": 0,
     "absmax": 1.0,
-    "size": 624,
-    "ok": false,
-    "error": "ValueError: array must not contain infs or NaNs"
+    "size": 576,
+    "ok": true
   },
   "qr_hinge_names": [
     "BeamSurfaceDistance",
-    "BeamCurveAngle",
-    "BeamCurveDistance"
+    "BeamCurveAngle"
   ],
   "fun_x0": {
-    "J": 3.6488658885395757e+17,
+    "J": 3.6488658885115315e+17,
     "n_nan": 0,
     "n_inf": 0,
-    "absmax": 8.605840365597701e+19,
+    "absmax": 8.605840365577044e+19,
     "size": 48
   },
   "target_bcd": 0.26074969792266645,
