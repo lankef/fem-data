@@ -91,9 +91,9 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = "monolithic",
 )
-save([Jstress], "init_Jstress.json")
-Jstress.save_run_vtu("init_run")
-with open("init_summary.json", "w") as fp:
+save([Jstress], "init_Jstress_auglag.json")
+Jstress.save_run_vtu("init_run_auglag")
+with open("init_summary_auglag.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
 print("# mesh node for all coils:", Jstress.n_nodes)
@@ -228,9 +228,9 @@ print("time", time_filament_2 - time_filament_1)
 print("result_code", result_code)
 print("minf", minf)
 print("xopt", xopt)
-save([Jstress], "fin_Jstress.json")
-Jstress.save_run_vtu("fin_run")
-with open("fin_results.pkl", "wb") as file:
+save([Jstress], "fin_Jstress_auglag.json")
+Jstress.save_run_vtu("fin_run_auglag")
+with open("fin_results_auglag.pkl", "wb") as file:
     pickle.dump({
         "result_code": result_code,
         "minf": minf,
@@ -238,6 +238,6 @@ with open("fin_results.pkl", "wb") as file:
         "time": time_filament_2 - time_filament_1,
     }, file)
 
-with open("fin_summary.json", "w") as fp:
+with open("fin_summary_auglag.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
