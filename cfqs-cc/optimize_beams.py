@@ -110,15 +110,18 @@ Jbca = BeamCurveAngle(
 
 # ----- Beam-curve distance
 
-target_bcd = (
-    np.sqrt(w1_beam**2 + w2_beam**2)
-    + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
-)
-Jbcd = BeamCurveDistance(
-    coil_support, 
-    dead_length=target_bcd*2,
-    minimum_distance=target_bcd*0.9,
-)
+# The ratio of w and coil-coil distance of CFQS
+# seems to often cause this dead zone to cover
+# the full beams.
+# target_bcd = (
+#     np.sqrt(w1_beam**2 + w2_beam**2)
+#     + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
+# )
+# Jbcd = BeamCurveDistance(
+#     coil_support, 
+#     dead_length=target_bcd*2,
+#     minimum_distance=target_bcd*0.9,
+# )
 
 # ----- Optimization -----
 
@@ -168,7 +171,7 @@ constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
     constraint_from_optimizable(Jbsd, -np.inf, 0),
     constraint_from_optimizable(Jbca, -np.inf, 0),
-    constraint_from_optimizable(Jbcd, -np.inf, 0),
+    # constraint_from_optimizable(Jbcd, -np.inf, 0),
 ]
 print("MAXITER =", MAXITER)
 print("# free dofs =", len(dofs))
