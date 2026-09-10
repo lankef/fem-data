@@ -1,0 +1,44 @@
+Job ID:         17295825
+Nodes:          1
+CPUs per task:  4
+Start time:     Wed Sep  9 20:00:47 EDT 2026
+Debug flags:    DEBUG_DUMMY_OBJ=0 DEBUG_SKIP_FEM=0 DEBUG_NO_NL_CONS=0 DEBUG_DROP_JBCD=0 DEBUG_FIX_THETAS=0 DEBUG_INTERIOR_THETA=0
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+Debug flags:
+  DEBUG_DUMMY_OBJ=0
+  DEBUG_SKIP_FEM=0
+  DEBUG_NO_NL_CONS=0
+  DEBUG_DROP_JBCD=0
+  DEBUG_FIX_THETAS=0
+  DEBUG_INTERIOR_THETA=0
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 48
+solving with float64
+# mesh node for all coils: [36400, 36400, 36400, 36400]
+# mesh cell for all coils: [21600, 21600, 21600, 21600]
+MAXITER = 1000
+# free dofs = 48
+# linear inequality constraints = 10
+preflight: evaluating fun(x0)
+solving with float64
+preflight fun(x0): {'J': 3.6488658885395757e+17, 'n_nan': 0, 'n_inf': 0, 'absmax': 8.605840365597701e+19, 'size': 48}
+Wrote logs/preflight.json
+End time:       Wed Sep  9 20:05:42 EDT 2026

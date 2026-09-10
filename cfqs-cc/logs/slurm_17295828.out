@@ -1,0 +1,50 @@
+Job ID:         17295828
+Nodes:          1
+CPUs per task:  4
+Start time:     Wed Sep  9 19:59:53 EDT 2026
+Debug flags:    DEBUG_DROP_JBCD=0 DEBUG_INTERIOR_THETA=0
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+Debug flags:
+  DEBUG_DROP_JBCD=0
+  DEBUG_INTERIOR_THETA=0
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 48
+target_bcd = 0.26074969792266645
+dead_length = 0.5214993958453329
+# free dofs = 48
+# linear inequality constraints = 10
+include_jbcd = True
+Wrote logs/preflight.json
+stacked_qr: {'shape': [13, 48], 'n_nan': 0, 'n_inf': 0, 'absmax': 1.0, 'size': 624, 'ok': True}
+Jbcd_geometry n_active_spans = 0
+Jbcd_shortest = inf
+n_thetas_on_lb = 16
+Running dummy trust-constr (maxiter=2)
+| niter |f evals|CG iter|  obj func   |tr radius |   opt    |  c viol  |
+|-------|-------|-------|-------------|----------|----------|----------|
+|   1   |   1   |   0   | +0.0000e+00 | 1.00e+00 | 2.05e-02 | 0.00e+00 |
+|   2   |   2   |   2   | +0.0000e+00 | 6.81e+00 | 2.30e-02 | 1.77e-03 |
+
+The maximum number of function evaluations is exceeded.
+Number of iterations: 2, function evaluations: 2, CG iterations: 2, optimality: 2.30e-02, constraint violation: 1.77e-03, execution time: 0.049 s.
+dummy res.message = The maximum number of function evaluations is exceeded.
+dummy res.niter = 2
+End time:       Wed Sep  9 20:00:36 EDT 2026
