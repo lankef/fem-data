@@ -1,3 +1,45 @@
+Job ID:         17346140
+Nodes:          1
+CPUs per task:  4
+Start time:     Thu Sep 10 18:49:27 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 48
+solving with float64
+solving with float64
+# mesh node for all coils: [36400, 36400, 36400, 36400]
+# mesh cell for all coils: [21600, 21600, 21600, 21600]
+MAXITER = 1000
+# free dofs = 48
+# linear inequality constraints = 10
+BSD_PENALTY_WEIGHT = 10.0
+x0 finite True in bounds True
+lb/ub finite True True
+J0 3.6488658885197024e+17 ||g0|| 1.869810907995594e+20 g0 finite True
+Jbsd 0.0 Jbsd*w 0.0
+Jbca 0.0
+dphis residuals (sum-1) [-0.125 -0.125 -0.125 -0.625 -0.625 -0.125 -0.125 -0.125 -0.625 -0.625]
+con2 0.0 auglag rho guess 10.0
+nlopt 2.11.0
+starting opt.optimize
 {"kind": "f", "n": 1, "want_grad": false, "J": 1.0000000000768665, "dx": 0.0, "x_norm": 1.2374368670764582, "x_maxabs": 0.25, "x_finite": true, "t": 1.5653812885284424}
 {"kind": "Jbsd", "n": 1, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.5771799087524414}
 {"kind": "Jbca", "n": 1, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.5874028205871582}
@@ -46,3 +88,11 @@
 {"kind": "f", "n": 16, "want_grad": true, "J": 0.9931238695292818, "dx": 0.054902264821783724, "x_norm": 1.2587786796683726, "x_maxabs": 0.27538238652138225, "x_finite": true, "g_norm": 2.4676632118388133e+20, "g_maxabs": 1.4832872377088685e+20, "g_finite": true, "t": 25.13593101501465}
 {"kind": "Jbsd", "n": 16, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.054902264821783724, "t": 25.149709701538086}
 {"kind": "Jbca", "n": 16, "want_grad": true, "c": 0.017305666014483814, "c_raw": 0.017305666014483814, "c_finite": true, "g_finite": true, "dx": 0.054902264821783724, "t": 25.161428451538086}
+time 25.164929151535034
+result_code -1 FAILURE
+minf 1.0000000000768665
+||xopt-x0|| 0.0
+eval counts {'f': 16, 'f_grad': 15, 'Jbsd': 16, 'Jbca': 16, 'dphis': 160}
+xopt [0.125 0.25  0.25  0.25  0.125 0.25  0.25  0.25  0.125 0.25  0.25  0.25  0.125 0.25  0.125 0.25  0.125 0.25  0.25  0.25  0.125 0.25  0.25  0.25  0.125 0.25  0.25  0.25  0.125 0.25  0.125 0.25  0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.    0.   ]
+NLopt returned a failure code; exceptions were disabled so the script continued and wrote fin_* at the last evaluated x (x0 if no step was accepted).
+End time:       Thu Sep 10 18:54:20 EDT 2026
