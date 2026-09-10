@@ -1,0 +1,243 @@
+# This protototype py optimizes support only fixing 
+# coil dofs. Its goal is to investigate how challenging 
+# support optimization is. If support optimization is 
+# not too bad, then we can handle support like an optimization
+# subproblem, because handling support and coils together
+# can cause coils to converge prematurely. 
+#
+# Constrained variant: CoilSupportBeamsSorted + NLopt AUGLAG
+# (L-BFGS local) with box bounds from Jstress.bounds and
+# inequalities sum_j dphis*[i][j] <= 1 per coil/group for
+# dphis_start_cc and dphis_end_cc. Beam–plasma distance is
+# scaled 10x so its initial AL penalty is stronger than the
+# other constraints.
+
+from coil_fem.simsopt import (
+    CoilSupportBeamsSorted, 
+    BeamSurfaceDistance, 
+    BeamCurveAngle,
+    BeamCurveDistance,
+    CoilFEMObjective,
+)
+from simsopt.geo import CurveSurfaceDistance
+from simsopt import save, load
+import json
+import numpy as np
+import time
+import pickle
+from collections import defaultdict
+from pathlib import Path
+import nlopt
+
+MAXITER = 1000
+BSD_PENALTY_WEIGHT = 10.0  # others stay 1
+
+_ROOT = Path(__file__).resolve().parent.parent
+cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
+plasma_surface = cfqs_dict['plasma_surface']
+
+# Setting beam parameters
+w1_beam = 0.05
+w2_beam = 0.1
+fixed_dof_names = [
+    # "thetas_orientation_cc",
+    "w1_beam",
+    "w2_beam",
+]
+
+# Loading the coils.
+base_coils = cfqs_dict['base_coils']
+base_curves = [c.curve for c in base_coils]
+base_currents = [c.current for c in base_coils]
+
+# ----- FEM / support options -----
+
+_OPTIONS_PATH = _ROOT / "cfqs-options.json"
+opts = json.load(open(_OPTIONS_PATH))
+mesh_options = opts["mesh_options"]
+material_options = opts["material_options"]
+gravity_options = opts["gravity_options"]
+problem_options = opts["problem_options"]
+physics_options = opts["physics_options"]
+beam_options = opts["beam_options"]
+# beam_options["cross_section_type"] = "hollow_rectangle"
+fixed_clamp_options = opts["fixed_clamp_options"]
+
+# ----- Defining optimizable ----- 
+
+# One support object covers the whole base coilset
+coil_support = CoilSupportBeamsSorted(
+    base_coils=base_coils,
+    nfp=plasma_surface.nfp,
+    stellsym=plasma_surface.stellsym,
+    beam_options=beam_options,
+    w1_beam=w1_beam,
+    w2_beam=w2_beam,
+    fixed_clamp_options=fixed_clamp_options,
+    fixed_dof_names=fixed_dof_names,
+)
+
+# The Simsopt wrapper for a differentiable FEM problem.
+# It behaves like a simsopt objective.
+# max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
+Jstress = CoilFEMObjective(
+    coil_support,
+    metrics          = ("sq_max_von_mises_lse",), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+    metric_weights   = (1.,),
+    mesh_options     = mesh_options,
+    material_options = material_options,
+    gravity_options  = gravity_options,
+    problem_options  = problem_options,
+    physics_options  = physics_options,
+    coupling         = "monolithic",
+)
+save([Jstress], "init_Jstress.json")
+Jstress.save_run_vtu("init_run")
+with open("init_summary.json", "w") as fp:
+    summary = Jstress.summary()
+    json.dump(summary, fp)
+print("# mesh node for all coils:", Jstress.n_nodes)
+print("# mesh cell for all coils:", Jstress.n_cells)
+
+# ----- Beam-surface distance -----
+# First, reading the coil plasma distance 
+min_csd = CurveSurfaceDistance(base_curves, plasma_surface, 0).shortest_distance()
+Jbsd = BeamSurfaceDistance(coil_support, plasma_surface, min_csd * 0.9)
+
+# ----- Beam-curve angle -----
+
+Jbca = BeamCurveAngle(
+    coil_support, minimum_angle=np.pi/6, mode="all"
+)
+
+# ----- Beam-curve distance
+
+# The ratio of w and coil-coil distance of CFQS
+# seems to often cause this dead zone to cover
+# the full beams.
+# target_bcd = (
+#     np.sqrt(w1_beam**2 + w2_beam**2)
+#     + np.sqrt(mesh_options["w1"]**2 + mesh_options["w2"]**2)
+# )
+# Jbcd = BeamCurveDistance(
+#     coil_support, 
+#     dead_length=target_bcd*2,
+#     minimum_distance=target_bcd*0.9,
+# )
+
+# ----- Optimization -----
+
+# Fix every coil degree of freedom (geometry + current) so only the free
+# CoilSupportBeamsSorted dofs (the beam network) are optimized.
+for c in base_curves:
+    c.fix_all()
+for cur in base_currents:
+    cur.fix_all()
+
+
+def nlopt_fun(x, grad):
+    Jstress.x = x
+    if grad.size > 0:
+        grad[:] = Jstress.dJ()
+    return float(Jstress.J())
+
+
+def nlopt_ineq_from_optimizable(obj, weight=1.0):
+    """Same as constraint_from_optimizable(obj, -inf, 0), plus a scale."""
+    def fc(x, grad):
+        obj.x = x
+        if grad.size > 0:
+            grad[:] = weight * obj.dJ()
+        return float(weight * obj.J())
+    return fc
+
+
+def _sum_dphis_A(dof_names):
+    """Build A for inequalities sum_j dphis*[i][j] <= 1 per coil/group.
+
+    Applies to free DOFs named ``dphis_start_cc`` and ``dphis_end_cc``
+    (simsopt names like ``...:dphis_start_cc(i,j)``).
+    """
+    keys = ("dphis_start_cc", "dphis_end_cc")
+    groups = defaultdict(list)
+    for j, name in enumerate(dof_names):
+        # simsopt: "CoilSupportBeamsSorted1:dphis_start_cc(0,3)"
+        local = name.split(":", 1)[-1]
+        key = local.split("(", 1)[0]
+        if key not in keys:
+            continue
+        i_coil = int(local.split("(", 1)[1].split(",", 1)[0])
+        groups[(key, i_coil)].append(j)
+    n = len(dof_names)
+    if not groups:
+        return np.zeros((0, n))
+    A = np.zeros((len(groups), n))
+    for row, idxs in enumerate(groups.values()):
+        A[row, idxs] = 1.0
+    return A
+
+
+def nlopt_dphis_ineq(A_row):
+    def fc(x, grad):
+        if grad.size > 0:
+            grad[:] = A_row
+        return float(A_row @ x - 1.0)  # sum_j dphis[g,j] - 1 <= 0
+    return fc
+
+
+dofs = np.asarray(Jstress.x, dtype=float)
+lb, ub = Jstress.bounds
+lb = np.asarray(lb, dtype=float)
+ub = np.asarray(ub, dtype=float)
+A = _sum_dphis_A(Jstress.dof_names)
+
+n = len(dofs)
+local = nlopt.opt(nlopt.LD_LBFGS, n)
+local.set_xtol_rel(1e-5)
+local.set_ftol_rel(1e-5)
+
+opt = nlopt.opt(nlopt.AUGLAG, n)
+opt.set_local_optimizer(local)
+opt.set_min_objective(nlopt_fun)
+opt.set_lower_bounds(lb)
+opt.set_upper_bounds(ub)
+opt.set_maxeval(MAXITER)
+opt.set_xtol_rel(1e-5)
+opt.set_ftol_rel(1e-5)
+opt.add_inequality_constraint(
+    nlopt_ineq_from_optimizable(Jbsd, BSD_PENALTY_WEIGHT), 1e-8
+)
+opt.add_inequality_constraint(
+    nlopt_ineq_from_optimizable(Jbca, 1.0), 1e-8
+)
+for row in A:
+    opt.add_inequality_constraint(nlopt_dphis_ineq(row), 1e-8)
+opt.set_exceptions_enabled(False)
+
+print("MAXITER =", MAXITER)
+print("# free dofs =", n)
+print("# linear inequality constraints =", A.shape[0])
+print("BSD_PENALTY_WEIGHT =", BSD_PENALTY_WEIGHT)
+time_filament_1 = time.time()
+xopt = opt.optimize(dofs)
+time_filament_2 = time.time()
+Jstress.x = xopt
+result_code = opt.last_optimize_result()
+minf = opt.last_optimum_value()
+print("time", time_filament_2 - time_filament_1)
+print("result_code", result_code)
+print("minf", minf)
+print("xopt", xopt)
+save([Jstress], "fin_Jstress.json")
+Jstress.save_run_vtu("fin_run")
+with open("fin_results.pkl", "wb") as file:
+    pickle.dump({
+        "result_code": result_code,
+        "minf": minf,
+        "x": np.asarray(xopt),
+        "time": time_filament_2 - time_filament_1,
+    }, file)
+
+with open("fin_summary.json", "w") as fp:
+    summary = Jstress.summary()
+    json.dump(summary, fp)
