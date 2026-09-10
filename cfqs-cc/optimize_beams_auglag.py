@@ -32,6 +32,23 @@ import nlopt
 MAXITER = 1000
 BSD_PENALTY_WEIGHT = 10.0  # others stay 1
 
+# NLopt result codes (nlopt.h). Printed because set_exceptions_enabled(False)
+# swallows NLOPT_FAILURE instead of raising.
+_NLOPT_RESULT = {
+    -5: "FORCED_STOP",
+    -4: "ROUNDOFF_LIMITED",
+    -3: "OUT_OF_MEMORY",
+    -2: "INVALID_ARGS",
+    -1: "FAILURE",
+    1: "SUCCESS",
+    2: "STOPVAL_REACHED",
+    3: "FTOL_REACHED",
+    4: "XTOL_REACHED",
+    5: "MAXEVAL_REACHED",
+    6: "MAXTIME_REACHED",
+}
+_EVAL_LOG = Path("auglag_evals.jsonl")
+
 _ROOT = Path(__file__).resolve().parent.parent
 cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
@@ -135,20 +152,80 @@ for cur in base_currents:
     cur.fix_all()
 
 
+_counts = defaultdict(int)
+_t0 = None
+_x0 = None
+
+
+def _log(record):
+    """Append one JSON line and echo it. Survives a killed slurm job."""
+    record["t"] = time.time() - _t0
+    line = json.dumps(record, default=float)
+    print(line, flush=True)
+    with open(_EVAL_LOG, "a") as fp:
+        fp.write(line + "\n")
+
+
+def _arr_stats(name, a):
+    a = np.asarray(a, dtype=float)
+    return {
+        f"{name}_norm": float(np.linalg.norm(a)),
+        f"{name}_maxabs": float(np.max(np.abs(a))) if a.size else 0.0,
+        f"{name}_finite": bool(np.all(np.isfinite(a))),
+    }
+
+
 def nlopt_fun(x, grad):
+    want_grad = grad.size > 0
+    _counts["f"] += 1
+    _counts["f_grad"] += int(want_grad)
     Jstress.x = x
-    if grad.size > 0:
-        grad[:] = Jstress.dJ()
-    return float(Jstress.J())
+    g = None
+    if want_grad:
+        g = np.asarray(Jstress.dJ(), dtype=float)
+        grad[:] = g
+    val = float(Jstress.J())
+    rec = {
+        "kind": "f",
+        "n": _counts["f"],
+        "want_grad": want_grad,
+        "J": val,
+        "dx": float(np.linalg.norm(np.asarray(x) - _x0)),
+        **_arr_stats("x", x),
+    }
+    if g is not None:
+        rec.update(_arr_stats("g", g))
+    _log(rec)
+    return val
 
 
-def nlopt_ineq_from_optimizable(obj, weight=1.0):
+def nlopt_ineq_from_optimizable(obj, weight=1.0, tag="c"):
     """Same as constraint_from_optimizable(obj, -inf, 0), plus a scale."""
     def fc(x, grad):
+        want_grad = grad.size > 0
+        _counts[tag] += 1
         obj.x = x
-        if grad.size > 0:
-            grad[:] = weight * obj.dJ()
-        return float(weight * obj.J())
+        raw = float(obj.J())
+        val = float(weight * raw)
+        if want_grad:
+            g = weight * np.asarray(obj.dJ(), dtype=float)
+            grad[:] = g
+            g_finite = bool(np.all(np.isfinite(g)))
+        else:
+            g_finite = True
+        # Constraints are cheap; log residuals every call so we see AUGLAG's
+        # first rho-setup eval and any NaN/Inf.
+        _log({
+            "kind": tag,
+            "n": _counts[tag],
+            "want_grad": want_grad,
+            "c": val,
+            "c_raw": raw,
+            "c_finite": bool(np.isfinite(val)),
+            "g_finite": g_finite,
+            "dx": float(np.linalg.norm(np.asarray(x) - _x0)),
+        })
+        return val
     return fc
 
 
@@ -179,6 +256,7 @@ def _sum_dphis_A(dof_names):
 
 def nlopt_dphis_ineq(A_row):
     def fc(x, grad):
+        _counts["dphis"] += 1
         if grad.size > 0:
             grad[:] = A_row
         return float(A_row @ x - 1.0)  # sum_j dphis[g,j] - 1 <= 0
@@ -190,8 +268,40 @@ lb, ub = Jstress.bounds
 lb = np.asarray(lb, dtype=float)
 ub = np.asarray(ub, dtype=float)
 A = _sum_dphis_A(Jstress.dof_names)
+dphis_c = A @ dofs - 1.0
 
 n = len(dofs)
+_x0 = dofs.copy()
+if _EVAL_LOG.exists():
+    _EVAL_LOG.unlink()
+
+# Snapshot at x0 before AUGLAG. Jbsd/Jbca are FEM-free; J/dJ reuse the
+# init solve already paid for by summary() / save_run_vtu.
+J0 = float(Jstress.J())
+g0 = np.asarray(Jstress.dJ(), dtype=float)
+c_bsd = float(Jbsd.J())
+c_bca = float(Jbca.J())
+viol = np.array(
+    [BSD_PENALTY_WEIGHT * c_bsd, c_bca, *np.maximum(dphis_c, 0.0)],
+    dtype=float,
+)
+con2 = float(np.sum(viol ** 2))
+rho_guess = 10.0 if con2 <= 0 else max(1e-6, min(10.0, 2.0 * abs(J0) / con2))
+print("MAXITER =", MAXITER)
+print("# free dofs =", n)
+print("# linear inequality constraints =", A.shape[0])
+print("BSD_PENALTY_WEIGHT =", BSD_PENALTY_WEIGHT)
+print("x0 finite", np.all(np.isfinite(dofs)), "in bounds",
+      bool(np.all(dofs >= lb - 1e-15) and np.all(dofs <= ub + 1e-15)))
+print("lb/ub finite", np.all(np.isfinite(lb)), np.all(np.isfinite(ub)))
+print("J0", J0, "||g0||", float(np.linalg.norm(g0)),
+      "g0 finite", bool(np.all(np.isfinite(g0))))
+print("Jbsd", c_bsd, "Jbsd*w", BSD_PENALTY_WEIGHT * c_bsd)
+print("Jbca", c_bca)
+print("dphis residuals (sum-1)", dphis_c)
+print("con2", con2, "auglag rho guess", rho_guess)
+print("nlopt", getattr(nlopt, "__version__", "?"))
+
 local = nlopt.opt(nlopt.LD_LBFGS, n)
 local.set_xtol_rel(1e-5)
 local.set_ftol_rel(1e-5)
@@ -205,36 +315,52 @@ opt.set_maxeval(MAXITER)
 opt.set_xtol_rel(1e-5)
 opt.set_ftol_rel(1e-5)
 opt.add_inequality_constraint(
-    nlopt_ineq_from_optimizable(Jbsd, BSD_PENALTY_WEIGHT), 1e-8
+    nlopt_ineq_from_optimizable(Jbsd, BSD_PENALTY_WEIGHT, tag="Jbsd"), 1e-8
 )
 opt.add_inequality_constraint(
-    nlopt_ineq_from_optimizable(Jbca, 1.0), 1e-8
+    nlopt_ineq_from_optimizable(Jbca, 1.0, tag="Jbca"), 1e-8
 )
-for row in A:
+for i, row in enumerate(A):
     opt.add_inequality_constraint(nlopt_dphis_ineq(row), 1e-8)
 opt.set_exceptions_enabled(False)
 
-print("MAXITER =", MAXITER)
-print("# free dofs =", n)
-print("# linear inequality constraints =", A.shape[0])
-print("BSD_PENALTY_WEIGHT =", BSD_PENALTY_WEIGHT)
-time_filament_1 = time.time()
+print("starting opt.optimize", flush=True)
+_t0 = time.time()
+time_filament_1 = _t0
 xopt = opt.optimize(dofs)
 time_filament_2 = time.time()
 Jstress.x = xopt
 result_code = opt.last_optimize_result()
 minf = opt.last_optimum_value()
+result_name = _NLOPT_RESULT.get(result_code, f"UNKNOWN({result_code})")
 print("time", time_filament_2 - time_filament_1)
-print("result_code", result_code)
+print("result_code", result_code, result_name)
 print("minf", minf)
+print("||xopt-x0||", float(np.linalg.norm(np.asarray(xopt) - _x0)))
+print("eval counts", dict(_counts))
 print("xopt", xopt)
+if result_code < 0:
+    print(
+        "NLopt returned a failure code; exceptions were disabled so the "
+        "script continued and wrote fin_* at the last evaluated x "
+        "(x0 if no step was accepted)."
+    )
 save([Jstress], "fin_Jstress_auglag.json")
 Jstress.save_run_vtu("fin_run_auglag")
 with open("fin_results_auglag.pkl", "wb") as file:
     pickle.dump({
         "result_code": result_code,
+        "result_name": result_name,
         "minf": minf,
         "x": np.asarray(xopt),
+        "x0": _x0,
+        "J0": J0,
+        "g0_norm": float(np.linalg.norm(g0)),
+        "Jbsd0": c_bsd,
+        "Jbca0": c_bca,
+        "con2": con2,
+        "rho_guess": rho_guess,
+        "counts": dict(_counts),
         "time": time_filament_2 - time_filament_1,
     }, file)
 
