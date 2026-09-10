@@ -108,6 +108,7 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = "monolithic",
 )
+Jstress_init = float(Jstress.J())
 save([Jstress], "init_Jstress_auglag.json")
 Jstress.save_run_vtu("init_run_auglag")
 with open("init_summary_auglag.json", "w") as fp:
@@ -127,7 +128,7 @@ Jbca = BeamCurveAngle(
     coil_support, minimum_angle=np.pi/6, mode="all"
 )
 
-# ----- Beam-curve distance
+# ----- Beam-curve distance -----
 
 # The ratio of w and coil-coil distance of CFQS
 # seems to often cause this dead zone to cover
@@ -184,7 +185,7 @@ def nlopt_fun(x, grad):
     if want_grad:
         g = np.asarray(Jstress.dJ(), dtype=float)
         grad[:] = g
-    val = float(Jstress.J())
+    val = float(Jstress.J()) / Jstress_init
     rec = {
         "kind": "f",
         "n": _counts["f"],
@@ -315,7 +316,7 @@ opt.set_maxeval(MAXITER)
 opt.set_xtol_rel(1e-5)
 opt.set_ftol_rel(1e-5)
 opt.add_inequality_constraint(
-    nlopt_ineq_from_optimizable(Jbsd, BSD_PENALTY_WEIGHT, tag="Jbsd"), 1e-8
+    nlopt_ineq_from_optimizable(Jbsd, BSD_PENALTY_WEIGHT/plasma_surface.minor_radius(), tag="Jbsd"), 1e-8
 )
 opt.add_inequality_constraint(
     nlopt_ineq_from_optimizable(Jbca, 1.0, tag="Jbca"), 1e-8
