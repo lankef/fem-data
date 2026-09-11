@@ -183,7 +183,7 @@ def nlopt_fun(x, grad):
     Jstress.x = x
     g = None
     if want_grad:
-        g = np.asarray(Jstress.dJ(), dtype=float)
+        g = np.asarray(Jstress.dJ() / Jstress_init, dtype=float)
         grad[:] = g
     val = float(Jstress.J()) / Jstress_init
     rec = {
