@@ -24,7 +24,7 @@ os.makedirs(OUT, exist_ok=True)
 BAD_BEAM = 1
 
 Jstress = load("fin_Jstress.json")[0]
-coil_support = Jstress._coil_support
+coil_support = Jstress.coil_support
 fem = Jstress.fem
 support = fem.support
 meshes = fem.meshes

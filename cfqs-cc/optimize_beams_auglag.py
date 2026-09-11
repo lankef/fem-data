@@ -77,8 +77,12 @@ gravity_options = opts["gravity_options"]
 problem_options = opts["problem_options"]
 physics_options = opts["physics_options"]
 beam_options = opts["beam_options"]
-# beam_options["cross_section_type"] = "hollow_rectangle"
 fixed_clamp_options = opts["fixed_clamp_options"]
+
+# ----- Adding stellarator-symmetric beams -----
+
+beam_options['i_beam_cs'] = [(2, 2), (3, 3)]
+beam_options['s_beam_cs'] = [True, True]
 
 # ----- Defining optimizable ----- 
 
@@ -108,8 +112,8 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = "monolithic",
 )
-Jstress_init = float(Jstress.J())
 save([Jstress], "init_Jstress_auglag.json")
+Jstress_init = float(Jstress.J())
 Jstress.save_run_vtu("init_run_auglag")
 with open("init_summary_auglag.json", "w") as fp:
     summary = Jstress.summary()
