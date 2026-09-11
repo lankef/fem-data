@@ -86,8 +86,8 @@ coil_per_half_fp = 5
 # base_curves = curves[:coil_per_half_fp]
 # base_currents = currents[:coil_per_half_fp]
 Jstress = load('../beams-qss/Jstress_csr.json')[0]
-base_curves = Jstress._coil_support.base_curves
-base_currents = Jstress._coil_support.base_currents
+base_curves = Jstress.coil_support.base_curves
+base_currents = Jstress.coil_support.base_currents
 
 # Coil-surface distance
 Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
