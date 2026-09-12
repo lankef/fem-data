@@ -1,1 +1,1 @@
-{"rms_displacement_m": 0.0014709543255841098, "max_displacement_m": 0.0036693279965966346, "rms_von_mises_Pa": 29770795.46556939, "max_von_mises_Pa": 419241097.8694078, "rms_body_force_Npm3": 31991507.35914425, "max_body_force_Npm3": 66054533.50562252, "strain_energy_J": 681.9533597775994}
+{"rms_displacement_m": 0.001352745270097444, "max_displacement_m": 0.002926926477293595, "rms_von_mises_Pa": 27666506.35908237, "max_von_mises_Pa": 319993985.7679206, "rms_body_force_Npm3": 31991507.35914425, "max_body_force_Npm3": 66054533.50562252, "strain_energy_J": 589.2748922992967}

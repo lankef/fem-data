@@ -81,8 +81,8 @@ fixed_clamp_options = opts["fixed_clamp_options"]
 
 # ----- Adding stellarator-symmetric beams -----
 
-beam_options['i_beam_cs'] = [(2, 2), (3, 3)]
-beam_options['s_beam_cs'] = [True, True]
+beam_options['i_beam_cs'] = [(2, 2), (3, 3), (3, 3)]
+beam_options['s_beam_cs'] = [True, True, False]
 
 # ----- Defining optimizable ----- 
 

@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "22518349504080": {
+    "22786682019408": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349504080",
+      "@name": "22786682019408",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -575,13 +575,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "22518349504080"
+        "value": "22786682019408"
       }
     },
-    "22518349504944": {
+    "22786682020272": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349504944",
+      "@name": "22786682020272",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -627,7 +627,7 @@
       "current": 312500.0,
       "dofs": {
         "$type": "ref",
-        "value": "22518349504944"
+        "value": "22786682020272"
       }
     },
     "Coil1": {
@@ -644,10 +644,10 @@
         "value": "Current1"
       }
     },
-    "22518349506672": {
+    "22786682022000": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349506672",
+      "@name": "22786682022000",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1210,13 +1210,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "22518349506672"
+        "value": "22786682022000"
       }
     },
-    "22518349507152": {
+    "22786682022480": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349507152",
+      "@name": "22786682022480",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1262,7 +1262,7 @@
       "current": 312500.0,
       "dofs": {
         "$type": "ref",
-        "value": "22518349507152"
+        "value": "22786682022480"
       }
     },
     "Coil2": {
@@ -1279,10 +1279,10 @@
         "value": "Current2"
       }
     },
-    "22518349508496": {
+    "22786682023824": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349508496",
+      "@name": "22786682023824",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1845,13 +1845,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "22518349508496"
+        "value": "22786682023824"
       }
     },
-    "22518349508976": {
+    "22786682024304": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349508976",
+      "@name": "22786682024304",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1897,7 +1897,7 @@
       "current": 312500.0,
       "dofs": {
         "$type": "ref",
-        "value": "22518349508976"
+        "value": "22786682024304"
       }
     },
     "Coil3": {
@@ -1914,10 +1914,10 @@
         "value": "Current3"
       }
     },
-    "22518349510320": {
+    "22786682025648": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349510320",
+      "@name": "22786682025648",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2480,13 +2480,13 @@
       "order": 10,
       "dofs": {
         "$type": "ref",
-        "value": "22518349510320"
+        "value": "22786682025648"
       }
     },
-    "22518349510800": {
+    "22786682026128": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22518349510800",
+      "@name": "22786682026128",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2532,7 +2532,7 @@
       "current": 312500.0,
       "dofs": {
         "$type": "ref",
-        "value": "22518349510800"
+        "value": "22786682026128"
       }
     },
     "Coil4": {
@@ -2549,10 +2549,10 @@
         "value": "Current4"
       }
     },
-    "22513583673648": {
+    "22781802009744": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "22513583673648",
+      "@name": "22781802009744",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2593,7 +2593,9 @@
           0.25,
           0.44499999999999995,
           0.485,
+          0.485,
           0.555,
+          0.515,
           0.515,
           0.0,
           0.0,
@@ -2613,6 +2615,7 @@
           0.0,
           0.0,
           0.0,
+          0.0,
           0.05,
           0.05,
           0.05,
@@ -2631,6 +2634,8 @@
           0.05,
           0.05,
           0.05,
+          0.05,
+          0.1,
           0.1,
           0.1,
           0.1,
@@ -2686,8 +2691,10 @@
         "dphis_start_cc(4,1)",
         "phis_end_cs(0)",
         "phis_end_cs(1)",
+        "phis_end_cs(2)",
         "phis_start_cs(0)",
         "phis_start_cs(1)",
+        "phis_start_cs(2)",
         "thetas_orientation_cc(0,0)",
         "thetas_orientation_cc(0,1)",
         "thetas_orientation_cc(0,2)",
@@ -2706,6 +2713,7 @@
         "thetas_orientation_cc(4,1)",
         "thetas_orientation_cs(0)",
         "thetas_orientation_cs(1)",
+        "thetas_orientation_cs(2)",
         "w1_beam(0,0)",
         "w1_beam(0,1)",
         "w1_beam(0,2)",
@@ -2724,6 +2732,7 @@
         "w1_beam(4,1)",
         "w1_beam(5,0)",
         "w1_beam(5,1)",
+        "w1_beam(5,2)",
         "w2_beam(0,0)",
         "w2_beam(0,1)",
         "w2_beam(0,2)",
@@ -2741,7 +2750,8 @@
         "w2_beam(4,0)",
         "w2_beam(4,1)",
         "w2_beam(5,0)",
-        "w2_beam(5,1)"
+        "w2_beam(5,1)",
+        "w2_beam(5,2)"
       ],
       "free": {
         "@module": "numpy",
@@ -2802,6 +2812,11 @@
           true,
           true,
           true,
+          true,
+          true,
+          true,
+          false,
+          false,
           false,
           false,
           false,
@@ -2879,8 +2894,13 @@
           0.0,
           -0.05500000000000005,
           -0.015000000000000013,
+          -0.015000000000000013,
           0.05500000000000005,
           0.015000000000000013,
+          0.015000000000000013,
+          0.0,
+          0.0,
+          0.0,
           0.0,
           0.0,
           0.0,
@@ -2976,7 +2996,9 @@
           1.0,
           0.945,
           0.985,
+          0.985,
           1.0550000000000002,
+          1.0150000000000001,
           1.0150000000000001,
           1.0,
           1.0,
@@ -2996,6 +3018,9 @@
           1.0,
           1.0,
           1.0,
+          1.0,
+          Infinity,
+          Infinity,
           Infinity,
           Infinity,
           Infinity,
@@ -3077,11 +3102,16 @@
           [
             3,
             3
+          ],
+          [
+            3,
+            3
           ]
         ],
         "s_beam_cs": [
           true,
-          true
+          true,
+          false
         ],
         "k_attachment": 409401501425318.75
       },
@@ -3108,7 +3138,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "22513583673648"
+        "value": "22781802009744"
       },
       "w1_beam": 0.05,
       "w2_beam": 0.1
