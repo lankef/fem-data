@@ -85,7 +85,7 @@ coil_per_half_fp = 5
 # )
 # base_curves = curves[:coil_per_half_fp]
 # base_currents = currents[:coil_per_half_fp]
-Jstress = load('../beams-qss/Jstress_csr.json')[0]
+Jstress = load('../beams-cc/Jstress_csr.json')[0]
 base_curves = Jstress.coil_support.base_curves
 base_currents = Jstress.coil_support.base_currents
 
@@ -139,21 +139,6 @@ coil_support = CoilSupportBeamsCSRSorted(
     fixed_dof_names=fixed_dof_names,
 )
 
-# The Simsopt wrapper for a differentiable FEM problem.
-# It behaves like a simsopt objective.
-# max_von_mises_lse is strictly inferior to l2_von_mises (it can't make max lower)
-# Jstress = CoilFEMObjective(
-#     coil_support,
-#     metrics          = ("sq_max_von_mises_lse"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
-#     metric_weights   = (1.,),
-#     mesh_options     = mesh_options,
-#     material_options = material_options,
-#     gravity_options  = gravity_options,
-#     problem_options  = problem_options,
-#     physics_options  = physics_options,
-#     coupling         = "monolithic",
-# )
-save([Jstress], "init_Jstress.json")
 Jstress.save_run_vtu("init_run")
 with open("init_summary.json", "w") as fp:
     summary = Jstress.summary()

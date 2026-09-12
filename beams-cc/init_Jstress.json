@@ -9,10 +9,10 @@
     }
   ],
   "simsopt_objs": {
-    "23023541610992": {
+    "22667528940688": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541610992",
+      "@name": "22667528940688",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -507,13 +507,13 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "23023541610992"
+        "value": "22667528940688"
       }
     },
-    "23023541887696": {
+    "22667529184624": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541887696",
+      "@name": "22667529184624",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -559,7 +559,7 @@
       "current": 1620000.0,
       "dofs": {
         "$type": "ref",
-        "value": "23023541887696"
+        "value": "22667529184624"
       }
     },
     "Coil71": {
@@ -576,10 +576,10 @@
         "value": "Current1"
       }
     },
-    "23023541612336": {
+    "22667528942032": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541612336",
+      "@name": "22667528942032",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1074,7 +1074,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "23023541612336"
+        "value": "22667528942032"
       }
     },
     "Coil72": {
@@ -1091,10 +1091,10 @@
         "value": "Current1"
       }
     },
-    "23023541615120": {
+    "22667528944816": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541615120",
+      "@name": "22667528944816",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -1589,7 +1589,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "23023541615120"
+        "value": "22667528944816"
       }
     },
     "Coil73": {
@@ -1606,10 +1606,10 @@
         "value": "Current1"
       }
     },
-    "23023541885104": {
+    "22667529182032": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541885104",
+      "@name": "22667529182032",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2104,7 +2104,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "23023541885104"
+        "value": "22667529182032"
       }
     },
     "Coil74": {
@@ -2121,10 +2121,10 @@
         "value": "Current1"
       }
     },
-    "23023541885776": {
+    "22667529182704": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23023541885776",
+      "@name": "22667529182704",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -2619,7 +2619,7 @@
       "order": 8,
       "dofs": {
         "$type": "ref",
-        "value": "23023541885776"
+        "value": "22667529182704"
       }
     },
     "Coil75": {
@@ -2636,10 +2636,10 @@
         "value": "Current1"
       }
     },
-    "23020023429840": {
+    "22663700561264": {
       "@module": "simsopt._core.optimizable",
       "@class": "DOFs",
-      "@name": "23020023429840",
+      "@name": "22663700561264",
       "@version": "1.10.7.dev380+gf8c9be314",
       "x": {
         "@module": "numpy",
@@ -3339,9 +3339,12 @@
       "dphis_start_cc": null,
       "dphis_end_cc": null,
       "dphis_start_cf": null,
+      "phis_start_cs": null,
+      "phis_end_cs": null,
       "x_foundation": null,
       "thetas_orientation_cc": null,
       "thetas_orientation_cf": null,
+      "thetas_orientation_cs": null,
       "fixed_clamp_options": {
         "enabled": true,
         "r_clamp": 0.173,
@@ -3378,7 +3381,7 @@
       "names": null,
       "dofs": {
         "$type": "ref",
-        "value": "23020023429840"
+        "value": "22663700561264"
       },
       "r_beam": 0.08
     },
@@ -3392,7 +3395,7 @@
         "value": "CoilSupportBeamsSorted1"
       },
       "metrics": [
-        "sq_max_von_mises_lse"
+        "l2_von_mises"
       ],
       "metric_weights": [
         1.0

@@ -1,0 +1,120 @@
+Job ID:         17498807
+Nodes:          1
+CPUs per task:  4
+Start time:     Sat Sep 12 16:55:33 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 48
+solving with float64
+solving with float64
+# mesh node for all coils: [36400, 36400, 36400, 36400]
+# mesh cell for all coils: [21600, 21600, 21600, 21600]
+MAXITER = 1000
+# free dofs = 48
+# linear inequality constraints = 10
+BSD_PENALTY_WEIGHT = 10.0
+x0 finite True in bounds True
+lb/ub finite True True
+J0 186322675018449.7 ||g0|| 5008199522485188.0 g0 finite True
+Jbsd 0.0 Jbsd*w 0.0
+Jbca 0.0
+dphis residuals (sum-1) [-0.125 -0.125 -0.125 -0.625 -0.625 -0.125 -0.125 -0.125 -0.625 -0.625]
+con2 0.0 auglag rho guess 10.0
+nlopt 2.11.0
+starting opt.optimize
+{"kind": "f", "n": 1, "want_grad": false, "J": 1.0000000000085607, "dx": 0.0, "x_norm": 1.2374368670764582, "x_maxabs": 0.25, "x_finite": true, "t": 1.560469627380371}
+{"kind": "Jbsd", "n": 1, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.587038278579712}
+{"kind": "Jbca", "n": 1, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.6054646968841553}
+{"kind": "f", "n": 2, "want_grad": true, "J": 1.000000000004128, "dx": 0.0, "x_norm": 1.2374368670764582, "x_maxabs": 0.25, "x_finite": true, "g_norm": 26.879173575470197, "g_maxabs": 15.89598923183328, "g_finite": true, "t": 3.1553304195404053}
+{"kind": "Jbsd", "n": 2, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 3.171738862991333}
+{"kind": "Jbca", "n": 2, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 3.18765926361084}
+{"kind": "f", "n": 3, "want_grad": true, "J": 2.586498924609817, "dx": 0.4224472848338836, "x_norm": 1.3219770066514611, "x_maxabs": 0.34403461546807745, "x_finite": true, "g_norm": 36.90646676605485, "g_maxabs": 14.222259256306984, "g_finite": true, "t": 4.735077381134033}
+{"kind": "Jbsd", "n": 3, "want_grad": true, "c": 0.0009023536083522346, "c_raw": 2.074624496726895e-05, "c_finite": true, "g_finite": true, "dx": 0.4224472848338836, "t": 4.752028465270996}
+{"kind": "Jbca", "n": 3, "want_grad": true, "c": 0.012349590654931518, "c_raw": 0.012349590654931518, "c_finite": true, "g_finite": true, "dx": 0.4224472848338836, "t": 4.767277956008911}
+{"kind": "f", "n": 4, "want_grad": true, "J": 1.2919481686147816, "dx": 0.12728376421903084, "x_norm": 1.2485487281363081, "x_maxabs": 0.2783327180771739, "x_finite": true, "g_norm": 17.977295051857787, "g_maxabs": 10.628199563206019, "g_finite": true, "t": 6.3142828941345215}
+{"kind": "Jbsd", "n": 4, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12728376421903084, "t": 6.329601526260376}
+{"kind": "Jbca", "n": 4, "want_grad": true, "c": 0.010593917726445221, "c_raw": 0.010593917726445221, "c_finite": true, "g_finite": true, "dx": 0.12728376421903084, "t": 6.343662261962891}
+{"kind": "f", "n": 5, "want_grad": true, "J": 0.9782631689145738, "dx": 0.044159420806746716, "x_norm": 1.2398237913459977, "x_maxabs": 0.2598296623127506, "x_finite": true, "g_norm": 17.620309552009207, "g_maxabs": 7.232446277954154, "g_finite": true, "t": 7.888016939163208}
+{"kind": "Jbsd", "n": 5, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.044159420806746716, "t": 7.903493881225586}
+{"kind": "Jbca", "n": 5, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.044159420806746716, "t": 7.9164721965789795}
+{"kind": "f", "n": 6, "want_grad": true, "J": 0.8076290525576171, "dx": 0.05543360699886332, "x_norm": 1.2499266849040267, "x_maxabs": 0.26581396722840445, "x_finite": true, "g_norm": 12.27706630845173, "g_maxabs": 6.6311750854870715, "g_finite": true, "t": 9.465686798095703}
+{"kind": "Jbsd", "n": 6, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.05543360699886332, "t": 9.481295347213745}
+{"kind": "Jbca", "n": 6, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.05543360699886332, "t": 9.497180938720703}
+{"kind": "f", "n": 7, "want_grad": true, "J": 0.58112273267414, "dx": 0.08651019143233307, "x_norm": 1.2707728732266017, "x_maxabs": 0.2777578085809062, "x_finite": true, "g_norm": 5.865013233636623, "g_maxabs": 2.410022583833255, "g_finite": true, "t": 11.044888019561768}
+{"kind": "Jbsd", "n": 7, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.08651019143233307, "t": 11.062144994735718}
+{"kind": "Jbca", "n": 7, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.08651019143233307, "t": 11.076991081237793}
+{"kind": "f", "n": 8, "want_grad": true, "J": 0.529133962332047, "dx": 0.10853151667555838, "x_norm": 1.2846242830171193, "x_maxabs": 0.2835003204884785, "x_finite": true, "g_norm": 7.052992164395734, "g_maxabs": 2.673143117165709, "g_finite": true, "t": 12.623451471328735}
+{"kind": "Jbsd", "n": 8, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.10853151667555838, "t": 12.638986349105835}
+{"kind": "Jbca", "n": 8, "want_grad": true, "c": 0.002273794570832544, "c_raw": 0.002273794570832544, "c_finite": true, "g_finite": true, "dx": 0.10853151667555838, "t": 12.652301549911499}
+{"kind": "f", "n": 9, "want_grad": true, "J": 0.4959613499250776, "dx": 0.12003383039245262, "x_norm": 1.2931740311705702, "x_maxabs": 0.28985775341800635, "x_finite": true, "g_norm": 6.827184411161393, "g_maxabs": 2.8547801459222404, "g_finite": true, "t": 14.198059320449829}
+{"kind": "Jbsd", "n": 9, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12003383039245262, "t": 14.213390111923218}
+{"kind": "Jbca", "n": 9, "want_grad": true, "c": 0.00012725174181015512, "c_raw": 0.00012725174181015512, "c_finite": true, "g_finite": true, "dx": 0.12003383039245262, "t": 14.227437019348145}
+{"kind": "f", "n": 10, "want_grad": true, "J": 0.49298850317853615, "dx": 0.13009855400736364, "x_norm": 1.2962788287165072, "x_maxabs": 0.29607059349409937, "x_finite": true, "g_norm": 6.499858476959303, "g_maxabs": 2.4763943007021303, "g_finite": true, "t": 15.774441957473755}
+{"kind": "Jbsd", "n": 10, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.13009855400736364, "t": 15.788028478622437}
+{"kind": "Jbca", "n": 10, "want_grad": true, "c": 3.665552778349109e-05, "c_raw": 3.665552778349109e-05, "c_finite": true, "g_finite": true, "dx": 0.13009855400736364, "t": 15.805138349533081}
+{"kind": "f", "n": 11, "want_grad": true, "J": 0.4463575441764485, "dx": 0.12605311830601254, "x_norm": 1.2920732092187528, "x_maxabs": 0.2924740921806249, "x_finite": true, "g_norm": 6.555042659626366, "g_maxabs": 3.0527744682535354, "g_finite": true, "t": 17.35530948638916}
+{"kind": "Jbsd", "n": 11, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12605311830601254, "t": 17.373206853866577}
+{"kind": "Jbca", "n": 11, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12605311830601254, "t": 17.389647960662842}
+{"kind": "f", "n": 12, "want_grad": true, "J": 0.8682449057535603, "dx": 0.1636157916713602, "x_norm": 1.279460701009806, "x_maxabs": 0.319127559192384, "x_finite": true, "g_norm": 15.414198186868989, "g_maxabs": 7.284733265080737, "g_finite": true, "t": 18.936574697494507}
+{"kind": "Jbsd", "n": 12, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.1636157916713602, "t": 18.951708555221558}
+{"kind": "Jbca", "n": 12, "want_grad": true, "c": 0.004835777330545568, "c_raw": 0.004835777330545568, "c_finite": true, "g_finite": true, "dx": 0.1636157916713602, "t": 18.96601438522339}
+{"kind": "f", "n": 13, "want_grad": true, "J": 0.42998379540442894, "dx": 0.12970273223577272, "x_norm": 1.2885686437562658, "x_maxabs": 0.29294584095491516, "x_finite": true, "g_norm": 3.029639050386792, "g_maxabs": 1.3037332743685572, "g_finite": true, "t": 20.512489795684814}
+{"kind": "Jbsd", "n": 13, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12970273223577272, "t": 20.52635359764099}
+{"kind": "Jbca", "n": 13, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.12970273223577272, "t": 20.539371967315674}
+{"kind": "f", "n": 14, "want_grad": true, "J": 0.415689024512386, "dx": 0.1335801674750426, "x_norm": 1.2899280422417645, "x_maxabs": 0.29300787991086336, "x_finite": true, "g_norm": 6.172125609153943, "g_maxabs": 3.3376873318339633, "g_finite": true, "t": 22.08639621734619}
+{"kind": "Jbsd", "n": 14, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.1335801674750426, "t": 22.10113763809204}
+{"kind": "Jbca", "n": 14, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.1335801674750426, "t": 22.117849111557007}
+{"kind": "f", "n": 15, "want_grad": true, "J": 0.8408679373764008, "dx": 0.248251783739797, "x_norm": 1.3276119600443386, "x_maxabs": 0.32426077090569827, "x_finite": true, "g_norm": 9.932825817109904, "g_maxabs": 4.602694366595808, "g_finite": true, "t": 23.665183305740356}
+{"kind": "Jbsd", "n": 15, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.248251783739797, "t": 23.683356523513794}
+{"kind": "Jbca", "n": 15, "want_grad": true, "c": 0.006812313800755521, "c_raw": 0.006812313800755521, "c_finite": true, "g_finite": true, "dx": 0.248251783739797, "t": 23.698688745498657}
+{"kind": "f", "n": 16, "want_grad": true, "J": 0.40468300885247943, "dx": 0.14943795832271903, "x_norm": 1.2952099675953948, "x_maxabs": 0.2954818931973071, "x_finite": true, "g_norm": 2.940250394331305, "g_maxabs": 0.9283218579413416, "g_finite": true, "t": 25.248180866241455}
+{"kind": "Jbsd", "n": 16, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.14943795832271903, "t": 25.26411485671997}
+{"kind": "Jbca", "n": 16, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.14943795832271903, "t": 25.27976965904236}
+{"kind": "f", "n": 17, "want_grad": true, "J": 0.38662851442197954, "dx": 0.15572831978960602, "x_norm": 1.2972797289611513, "x_maxabs": 0.2949583081681417, "x_finite": true, "g_norm": 1.486451094988169, "g_maxabs": 0.6608097599898899, "g_finite": true, "t": 26.827730178833008}
+{"kind": "Jbsd", "n": 17, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.15572831978960602, "t": 26.843135118484497}
+{"kind": "Jbca", "n": 17, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.15572831978960602, "t": 26.859328031539917}
+{"kind": "f", "n": 18, "want_grad": true, "J": 0.3665789521681508, "dx": 0.18250311237404657, "x_norm": 1.3049734470567684, "x_maxabs": 0.29933695507465763, "x_finite": true, "g_norm": 11.622605718974118, "g_maxabs": 7.707630085451557, "g_finite": true, "t": 28.4088077545166}
+{"kind": "Jbsd", "n": 18, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18250311237404657, "t": 28.429102182388306}
+{"kind": "Jbca", "n": 18, "want_grad": true, "c": 0.0003900603825149492, "c_raw": 0.0003900603825149492, "c_finite": true, "g_finite": true, "dx": 0.18250311237404657, "t": 28.445687294006348}
+{"kind": "f", "n": 19, "want_grad": true, "J": 0.35482291271052047, "dx": 0.18502188121554902, "x_norm": 1.3030743850118458, "x_maxabs": 0.30001755943119873, "x_finite": true, "g_norm": 6.633246735731095, "g_maxabs": 3.6875275237523413, "g_finite": true, "t": 29.99344253540039}
+{"kind": "Jbsd", "n": 19, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18502188121554902, "t": 30.00728416442871}
+{"kind": "Jbca", "n": 19, "want_grad": true, "c": 0.0030749912990521147, "c_raw": 0.0030749912990521147, "c_finite": true, "g_finite": true, "dx": 0.18502188121554902, "t": 30.02197241783142}
+{"kind": "f", "n": 20, "want_grad": true, "J": 0.37729657080799184, "dx": 0.15310261223881166, "x_norm": 1.2935240548857232, "x_maxabs": 0.29256365373419524, "x_finite": true, "g_norm": 3.1174036874092974, "g_maxabs": 1.2355974393281528, "g_finite": true, "t": 31.569528579711914}
+{"kind": "Jbsd", "n": 20, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.15310261223881166, "t": 31.587175846099854}
+{"kind": "Jbca", "n": 20, "want_grad": true, "c": 0.0008889976976558834, "c_raw": 0.0008889976976558834, "c_finite": true, "g_finite": true, "dx": 0.15310261223881166, "t": 31.605302333831787}
+{"kind": "f", "n": 21, "want_grad": true, "J": 0.3553952139734561, "dx": 0.1764885494038213, "x_norm": 1.3004776566641658, "x_maxabs": 0.2980612623309287, "x_finite": true, "g_norm": 2.584379826621061, "g_maxabs": 1.3465939116030605, "g_finite": true, "t": 33.157583475112915}
+{"kind": "Jbsd", "n": 21, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.1764885494038213, "t": 33.173497676849365}
+{"kind": "Jbca", "n": 21, "want_grad": true, "c": 0.0024518524771442065, "c_raw": 0.0024518524771442065, "c_finite": true, "g_finite": true, "dx": 0.1764885494038213, "t": 33.189258098602295}
+{"kind": "f", "n": 22, "want_grad": true, "J": 0.3558063463567716, "dx": 0.18208075236179586, "x_norm": 1.3021753945597674, "x_maxabs": 0.2993457037418225, "x_finite": true, "g_norm": 2.381920025138936, "g_maxabs": 1.290113185264251, "g_finite": true, "t": 34.737717628479004}
+{"kind": "Jbsd", "n": 22, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18208075236179586, "t": 34.754830837249756}
+{"kind": "Jbca", "n": 22, "want_grad": true, "c": 0.002821774219115914, "c_raw": 0.002821774219115914, "c_finite": true, "g_finite": true, "dx": 0.18208075236179586, "t": 34.768940925598145}
+{"kind": "f", "n": 23, "want_grad": true, "J": 0.35601726092227676, "dx": 0.18421433161188153, "x_norm": 1.302827121164868, "x_maxabs": 0.2998333264907404, "x_finite": true, "g_norm": 3.4236280118930984, "g_maxabs": 2.146503044457459, "g_finite": true, "t": 36.31641387939453}
+{"kind": "Jbsd", "n": 23, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18421433161188153, "t": 36.33256244659424}
+{"kind": "Jbca", "n": 23, "want_grad": true, "c": 0.0029978113884071888, "c_raw": 0.0029978113884071888, "c_finite": true, "g_finite": true, "dx": 0.18421433161188153, "t": 36.351526498794556}
+{"kind": "f", "n": 24, "want_grad": true, "J": 0.35652813443049386, "dx": 0.18487995490345885, "x_norm": 1.3030309049891313, "x_maxabs": 0.2999851934940567, "x_finite": true, "g_norm": 3.267996651126677, "g_maxabs": 1.3978382935016274, "g_finite": true, "t": 37.901073932647705}
+{"kind": "Jbsd", "n": 24, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18487995490345885, "t": 37.9173948764801}
+{"kind": "Jbca", "n": 24, "want_grad": true, "c": 0.0030610218192080605, "c_raw": 0.0030610218192080605, "c_finite": true, "g_finite": true, "dx": 0.18487995490345885, "t": 37.93404006958008}
+{"kind": "f", "n": 25, "want_grad": true, "J": 0.3547985149339419, "dx": 0.18501547962028247, "x_norm": 1.3030724236258622, "x_maxabs": 0.3000160996812308, "x_finite": true, "g_norm": 6.389087663238433, "g_maxabs": 3.53021569474494, "g_finite": true, "t": 39.480133056640625}
+{"kind": "Jbsd", "n": 25, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.18501547962028247, "t": 39.49813175201416}
+{"kind": "Jbca", "n": 25, "want_grad": true, "c": 0.0030743575213573395, "c_raw": 0.0030743575213573395, "c_finite": true, "g_finite": true, "dx": 0.18501547962028247, "t": 39.515087366104126}
+{"kind": "f", "n": 26, "want_grad": true, "J": 0.34966016761913354, "dx": 0.1840775542419229, "x_norm": 1.2992546110153276, "x_maxabs": 0.2981339359389625, "x_finite": true, "g_norm": 2.3274121276902546, "g_maxabs": 0.8038234132546331, "g_finite": true, "t": 41.06430697441101}
+{"kind": "Jbsd", "n": 26, "want_grad": true, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.1840775542419229, "t": 41.08132028579712}
+{"kind": "Jbca", "n": 26, "want_grad": true, "c": 0.004163390723286453, "c_raw": 0.004163390723286453, "c_finite": true, "g_finite": true, "dx": 0.1840775542419229, "t": 41.09616827964783}

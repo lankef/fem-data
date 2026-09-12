@@ -1,0 +1,28 @@
+Job ID:         17498846
+Nodes:          1
+CPUs per task:  4
+Start time:     Sat Sep 12 16:58:52 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (4,), (2,), (2,)]
+    phis_start_cs - per-coil shapes: (2,)
+    phis_end_cs - per-coil shapes: (2,)
+    thetas_orientation_cs - per-coil shapes: (2,)
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 54
