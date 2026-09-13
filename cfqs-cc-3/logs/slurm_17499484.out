@@ -1,3 +1,48 @@
+Job ID:         17499484
+Nodes:          1
+CPUs per task:  4
+Start time:     Sat Sep 12 17:38:17 EDT 2026
+       __       ___      ___   ___                _______  _______ .___  ___. 
+      |  |     /   \     \  \ /  /               |   ____||   ____||   \/   | 
+      |  |    /  ^  \     \  V  /      ______    |  |__   |  |__   |  \  /  | 
+.--.  |  |   /  /_\  \     >   <      |______|   |   __|  |   __|  |  |\/|  | 
+|  `--'  |  /  _____  \   /  .  \                |  |     |  |____ |  |  |  | 
+ \______/  /__/     \__\ /__/ \__\               |__|     |_______||__|  |__| 
+                                                                              
+
+k_attachment is not provided. Based on the coil's stiffness, the auto-generated value is 4.0940e+14 N/m3.
+Beam network initialized.
+Optimizing:
+    dphis_end_cc - per-coil shapes: [(4,), (4,), (5,), (2,), (2,)]
+    dphis_start_cc - per-coil shapes: [(4,), (4,), (5,), (2,), (2,)]
+    thetas_orientation_cc - per-coil shapes: [(4,), (4,), (5,), (2,), (2,)]
+    phis_start_cs - per-coil shapes: (3,)
+    phis_end_cs - per-coil shapes: (3,)
+    thetas_orientation_cs - per-coil shapes: (3,)
+Fixing:
+    w1_beam
+    w2_beam
+    dphis_start_cf
+    x_foundation
+    thetas_orientation_cf
+Total # dofs: 60
+solving with float64
+solving with float64
+# mesh node for all coils: [36400, 36400, 36400, 36400]
+# mesh cell for all coils: [21600, 21600, 21600, 21600]
+MAXITER = 1000
+# free dofs = 60
+# linear inequality constraints = 10
+BSD_PENALTY_WEIGHT = 10.0
+x0 finite True in bounds True
+lb/ub finite True True
+J0 138402466025066.12 ||g0|| 3778379659326823.0 g0 finite True
+Jbsd 0.0 Jbsd*w 0.0
+Jbca 0.00021045655928426872
+dphis residuals (sum-1) [-0.125 -0.125 -0.1   -0.625 -0.625 -0.125 -0.125 -0.1   -0.625 -0.625]
+con2 4.429196334577291e-08 auglag rho guess 10.0
+nlopt 2.11.0
+starting opt.optimize
 {"kind": "f", "n": 1, "want_grad": false, "J": 0.9999999999791109, "dx": 0.0, "x_norm": 1.7239344535103416, "x_maxabs": 0.555, "x_finite": true, "t": 1.656036376953125}
 {"kind": "Jbsd", "n": 1, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.6699323654174805}
 {"kind": "Jbca", "n": 1, "want_grad": false, "c": 0.00021045655928426872, "c_raw": 0.00021045655928426872, "c_finite": true, "g_finite": true, "dx": 0.0, "t": 1.6807339191436768}
@@ -1486,3 +1531,10 @@
 {"kind": "f", "n": 496, "want_grad": false, "J": 0.27879135759537166, "dx": 0.3602036393970508, "x_norm": 1.816956392584532, "x_maxabs": 0.6116034394935467, "x_finite": true, "t": 830.2381370067596}
 {"kind": "Jbsd", "n": 496, "want_grad": false, "c": 0.0, "c_raw": 0.0, "c_finite": true, "g_finite": true, "dx": 0.3602036393970508, "t": 830.2519590854645}
 {"kind": "Jbca", "n": 496, "want_grad": false, "c": 9.943686232350176e-10, "c_raw": 9.943686232350176e-10, "c_finite": true, "g_finite": true, "dx": 0.3602036393970508, "t": 830.263974905014}
+time 830.2697193622589
+result_code 4 XTOL_REACHED
+minf 0.27879135759537166
+||xopt-x0|| 0.3602036393970508
+eval counts {'f': 496, 'f_grad': 475, 'Jbsd': 496, 'Jbca': 496, 'dphis': 4960}
+xopt [0.12459 0.30931 0.19073 0.27078 0.18387 0.23918 0.29252 0.2418  0.14873 0.2368  0.12126 0.18994 0.29894 0.10655 0.18013 0.13408 0.29583 0.11277 0.31228 0.1292  0.30473 0.13768 0.31377 0.1611  0.296   0.1983  0.27089 0.05018 0.18858 0.26592 0.15781 0.23724 0.12078 0.30817 0.49325 0.48735 0.46414 0.6116  0.49422 0.54791 0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.      0.     ]
+End time:       Sat Sep 12 17:59:27 EDT 2026

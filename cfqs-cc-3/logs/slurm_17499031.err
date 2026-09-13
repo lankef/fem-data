@@ -1,0 +1,5 @@
+[gl009.hpc.nyu.edu:1871003] pmix_mca_base_component_repository_open: unable to open /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so: File /scratch/lf2869/conda_envs/desc/lib/pmix/pmix_mca_pcompress_zlib.so.sl not found (ignored)
+/scratch/lf2869/code/coil-fem/src/coil_fem/simsopt/coil_support_beams.py:323: UserWarning: Unrecognized keys in beam_options: ['comment'].
+  warnings.warn(
+/scratch/lf2869/conda_envs/desc/lib/python3.12/site-packages/scipy/optimize/_differentiable_functions.py:552: UserWarning: delta_grad == 0.0. Check if the approximated function is linear. If the function is linear better results can be obtained by defining the Hessian as zero instead of using quasi-Newton approximations.
+  self.H.update(delta_x, delta_g)

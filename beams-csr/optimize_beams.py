@@ -85,13 +85,6 @@ coil_per_half_fp = 5
 # )
 # base_curves = curves[:coil_per_half_fp]
 # base_currents = currents[:coil_per_half_fp]
-Jstress = load('../beams-cc/Jstress_csr.json')[0]
-base_curves = Jstress.coil_support.base_curves
-base_currents = Jstress.coil_support.base_currents
-
-# Coil-surface distance
-Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
-dmin_cp = Jcsdist_init.shortest_distance()
 
 # ----- FEM / support options -----
 
@@ -107,6 +100,30 @@ beam_options["n_beam_cr"] = 1
 fixed_clamp_options = opts["fixed_clamp_options"]
 mesh_scale = 0.5
 
+# ----- Generating init conds -----
+
+fin_Jstress = load('../beams-cc/fin_Jstress.json')[0]
+
+# Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
+csr_order = 2
+csr_r = 3.5
+csr_options = {
+    "order": csr_order,
+    "w1": 0.3,   # width
+    "w2": 0.5,   # height
+    "n_phi": 64,
+    "E": beam_options["E"],
+    "nu": beam_options["nu"],
+}
+Jstress = load('../beams-cc/Jstress_csr.json')[0]
+base_curves = Jstress.coil_support.base_curves
+base_currents = Jstress.coil_support.base_currents
+
+# Coil-surface distance
+Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
+dmin_cp = Jcsdist_init.shortest_distance()
+
+
 # Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
 csr_order = 1 # 2
 csr_r = 3.5
@@ -118,6 +135,37 @@ csr_options = {
     "E": beam_options["E"],
     "nu": beam_options["nu"],
 }
+
+fin_support = fin_Jstress.coil_support
+dmin_csrcc = (
+    0.5 * math.hypot(csr_options["w1"], csr_options["w2"])
+    + 0.5 * math.hypot(mesh_options["w1"], mesh_options["w2"])
+) * 1.2
+
+csr_support = CoilSupportBeamsCSRSorted.from_clamps(
+    source=fin_support,
+    coil_csr_distance=dmin_csrcc,
+    csr_options=csr_options,
+    problem_options=problem_options,
+    thetas_orientation_cr=None,
+    fixed_dof_names=None,
+    n_ring_samples=200,
+    r_beam = 0.08
+    # **kwargs,
+)
+
+Jstress = CoilFEMObjective(
+    csr_support,
+    metrics          = ("l2_von_mises"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
+    metric_weights   = (1.,),
+    mesh_options     = mesh_options,
+    material_options = material_options,
+    gravity_options  = gravity_options,
+    problem_options  = problem_options,
+    physics_options  = physics_options,
+    coupling         = "monolithic",
+)
+
 # stellsym CurveRZFourier: 2*order+1 DOFs; circle = rc0=R
 csr_curve_dofs = np.zeros(2 * csr_order + 1)
 csr_curve_dofs[0] = csr_r

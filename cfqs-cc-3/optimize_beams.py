@@ -65,6 +65,7 @@ fixed_clamp_options = opts["fixed_clamp_options"]
 
 beam_options['i_beam_cs'] = [(2, 2), (3, 3), (3, 3)]
 beam_options['s_beam_cs'] = [True, True, False]
+beam_options['n_beam_cc'] = [4, 4, 5, 4, 4]
 
 # ----- Defining optimizable ----- 
 
