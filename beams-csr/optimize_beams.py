@@ -115,9 +115,6 @@ csr_options = {
     "E": beam_options["E"],
     "nu": beam_options["nu"],
 }
-Jstress = load('../beams-cc/Jstress_csr.json')[0]
-base_curves = Jstress.coil_support.base_curves
-base_currents = Jstress.coil_support.base_currents
 
 # Coil-surface distance
 Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
@@ -142,7 +139,7 @@ dmin_csrcc = (
     + 0.5 * math.hypot(mesh_options["w1"], mesh_options["w2"])
 ) * 1.2
 
-csr_support = CoilSupportBeamsCSRSorted.from_clamps(
+coil_support = CoilSupportBeamsCSRSorted.from_clamps(
     source=fin_support,
     coil_csr_distance=dmin_csrcc,
     csr_options=csr_options,
@@ -155,7 +152,7 @@ csr_support = CoilSupportBeamsCSRSorted.from_clamps(
 )
 
 Jstress = CoilFEMObjective(
-    csr_support,
+    coil_support,
     metrics          = ("l2_von_mises"), # ("sq_max_von_mises_lse"), # ("l2_von_mises",),
     metric_weights   = (1.,),
     mesh_options     = mesh_options,
@@ -165,6 +162,8 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = "monolithic",
 )
+base_curves = coil_support.base_curves
+base_currents = coil_support.base_currents
 
 # stellsym CurveRZFourier: 2*order+1 DOFs; circle = rc0=R
 csr_curve_dofs = np.zeros(2 * csr_order + 1)
@@ -174,19 +173,6 @@ csr_curve_dofs[0] = csr_r
 
 # One support object covers the whole base coilset
 base_coils = [Coil(c, I) for c, I in zip(base_curves, base_currents)]
-coil_support = CoilSupportBeamsCSRSorted(
-    base_coils=base_coils,
-    nfp=eq.boundary.nfp,
-    stellsym=eq.boundary.stellsym,
-    beam_options=beam_options,
-    csr_options=csr_options,
-    problem_options=problem_options,
-    csr_curve_dofs=csr_curve_dofs,
-    r_beam=r_beam,
-    fixed_clamp_options={"enabled": False}, # fixed_clamp_options,
-    fixed_dof_names=fixed_dof_names,
-)
-
 Jstress.save_run_vtu("init_run")
 with open("init_summary.json", "w") as fp:
     summary = Jstress.summary()
