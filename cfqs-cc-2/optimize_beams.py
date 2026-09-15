@@ -15,6 +15,7 @@ from coil_fem.simsopt import (
     BeamSurfaceDistance, 
     BeamCurveAngle,
     BeamCurveDistance,
+    BeamBeamDistance,
     CoilFEMObjective,
     constraint_from_optimizable
 )
@@ -128,6 +129,13 @@ Jbca = BeamCurveAngle(
 #     minimum_distance=target_bcd*0.9,
 # )
 
+# ----- Beam-beam distance -----
+
+Jbbd = BeamBeamDistance(
+    coil_support,
+    minimum_distance=np.sqrt(w1_beam**2 + w2_beam**2),
+)
+
 # ----- Optimization -----
 
 # Fix every coil degree of freedom (geometry + current) so only the free
@@ -176,6 +184,7 @@ constraints = [
     _sum_dphis_constraint(Jstress.dof_names),
     constraint_from_optimizable(Jbsd, -np.inf, 0),
     constraint_from_optimizable(Jbca, -np.inf, 0),
+    constraint_from_optimizable(Jbbd, -np.inf, 0),
     # constraint_from_optimizable(Jbcd, -np.inf, 0),
 ]
 print("MAXITER =", MAXITER)

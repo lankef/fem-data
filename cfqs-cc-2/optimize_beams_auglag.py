@@ -17,6 +17,7 @@ from coil_fem.simsopt import (
     BeamSurfaceDistance, 
     BeamCurveAngle,
     BeamCurveDistance,
+    BeamBeamDistance,
     CoilFEMObjective,
 )
 from simsopt.geo import CurveSurfaceDistance
@@ -146,6 +147,13 @@ Jbca = BeamCurveAngle(
 #     dead_length=target_bcd*2,
 #     minimum_distance=target_bcd*0.9,
 # )
+
+# ----- Beam-beam distance -----
+
+Jbbd = BeamBeamDistance(
+    coil_support,
+    minimum_distance=np.sqrt(w1_beam**2 + w2_beam**2),
+)
 
 # ----- Optimization -----
 
@@ -280,14 +288,15 @@ _x0 = dofs.copy()
 if _EVAL_LOG.exists():
     _EVAL_LOG.unlink()
 
-# Snapshot at x0 before AUGLAG. Jbsd/Jbca are FEM-free; J/dJ reuse the
+# Snapshot at x0 before AUGLAG. Jbsd/Jbca/Jbbd are FEM-free; J/dJ reuse the
 # init solve already paid for by summary() / save_run_vtu.
 J0 = float(Jstress.J())
 g0 = np.asarray(Jstress.dJ(), dtype=float)
 c_bsd = float(Jbsd.J())
 c_bca = float(Jbca.J())
+c_bbd = float(Jbbd.J())
 viol = np.array(
-    [BSD_PENALTY_WEIGHT * c_bsd, c_bca, *np.maximum(dphis_c, 0.0)],
+    [BSD_PENALTY_WEIGHT * c_bsd, c_bca, c_bbd, *np.maximum(dphis_c, 0.0)],
     dtype=float,
 )
 con2 = float(np.sum(viol ** 2))
@@ -303,6 +312,7 @@ print("J0", J0, "||g0||", float(np.linalg.norm(g0)),
       "g0 finite", bool(np.all(np.isfinite(g0))))
 print("Jbsd", c_bsd, "Jbsd*w", BSD_PENALTY_WEIGHT * c_bsd)
 print("Jbca", c_bca)
+print("Jbbd", c_bbd)
 print("dphis residuals (sum-1)", dphis_c)
 print("con2", con2, "auglag rho guess", rho_guess)
 print("nlopt", getattr(nlopt, "__version__", "?"))
@@ -324,6 +334,9 @@ opt.add_inequality_constraint(
 )
 opt.add_inequality_constraint(
     nlopt_ineq_from_optimizable(Jbca, 1.0, tag="Jbca"), 1e-8
+)
+opt.add_inequality_constraint(
+    nlopt_ineq_from_optimizable(Jbbd, 1.0, tag="Jbbd"), 1e-8
 )
 for i, row in enumerate(A):
     opt.add_inequality_constraint(nlopt_dphis_ineq(row), 1e-8)
@@ -363,6 +376,7 @@ with open("fin_results_auglag.pkl", "wb") as file:
         "g0_norm": float(np.linalg.norm(g0)),
         "Jbsd0": c_bsd,
         "Jbca0": c_bca,
+        "Jbbd0": c_bbd,
         "con2": con2,
         "rho_guess": rho_guess,
         "counts": dict(_counts),
