@@ -45,7 +45,7 @@ N_PHI = 4096
 UV_TOL = 2e-2
 
 _FIELD_KEYS = (
-    "clamp_centers", "r_clamp", "eps_sigmoid", "k_clamp",
+    "r_clamp", "eps_sigmoid", "k_clamp",
     "E", "nu", "rho", "g_vec",
 )
 
@@ -87,8 +87,12 @@ def load_vtu_problem(path: str = VTU_PATH):
     )
 
     fd = m.field_data
+    centers = fd.get("clamp_centers")
     params = {
-        "clamp_centers": np.asarray(fd["clamp_centers"], dtype=np.float64).reshape(-1, 3),
+        "clamp_centers": (
+            np.zeros((0, 3), dtype=np.float64) if centers is None
+            else np.asarray(centers, dtype=np.float64).reshape(-1, 3)
+        ),
         "r_clamp": float(np.asarray(fd["r_clamp"]).reshape(-1)[0]),
         "eps_sigmoid": float(np.asarray(fd["eps_sigmoid"]).reshape(-1)[0]),
         "k_clamp": float(np.asarray(fd["k_clamp"]).reshape(-1)[0]),
@@ -97,6 +101,11 @@ def load_vtu_problem(path: str = VTU_PATH):
         "rho": float(np.asarray(fd["rho"]).reshape(-1)[0]),
         "g_vec": np.asarray(fd["g_vec"], dtype=np.float64).reshape(3),
     }
+    params["grounded"] = bool(
+        params["clamp_centers"].shape[0]
+        and params["k_clamp"] != 0.0
+        and params["r_clamp"] > 0.0
+    )
     return domain, params
 
 
@@ -355,6 +364,43 @@ def _pack_quadrature_force(domain, f_vol_q: np.ndarray, vol_quad_deg: int):
     return f
 
 
+def load_resultants(domain, f, *, vol_quad_deg=VOL_QUAD_DEG):
+    """Net force, net torque, and their magnitude scales for the body load."""
+    x = ufl.SpatialCoordinate(domain)
+    dx = ufl.Measure(
+        "dx", domain=domain,
+        metadata={"quadrature_degree": vol_quad_deg},
+    )
+
+    def _s(expr):
+        return domain.comm.allreduce(
+            fem.assemble_scalar(fem.form(expr)), op=MPI.SUM,
+        )
+
+    fmag = ufl.sqrt(ufl.inner(f, f) + 1e-300)
+    F = np.array([_s(f[i] * dx) for i in range(3)])
+    T = np.array([_s(ufl.cross(x, f)[i] * dx) for i in range(3)])
+    return F, T, _s(fmag * dx), _s(ufl.sqrt(ufl.inner(x, x)) * fmag * dx)
+
+
+def _remove_rigid_body(uh):
+    """Subtract the least-squares best-fit rigid-body motion (in place)."""
+    V = uh.function_space
+    p = V.tabulate_dof_coordinates()
+    p = p - p.mean(axis=0)
+    n = p.shape[0]
+    modes = np.zeros((n, 3, 6))
+    for k in range(3):
+        modes[:, k, k] = 1.0
+        e = np.zeros(3)
+        e[k] = 1.0
+        modes[:, :, 3 + k] = np.cross(e, p)
+    A = modes.reshape(n * 3, 6)
+    u = uh.x.array.reshape(-1, 3)
+    u -= (A @ np.linalg.lstsq(A, u.reshape(-1), rcond=None)[0]).reshape(-1, 3)
+    uh.x.scatter_forward()
+
+
 def _clamp_weight_ufl(x, centers, r_clamp: float, eps_sigmoid: float):
     width2 = float(eps_sigmoid * r_clamp) ** 2
     r2 = float(r_clamp) ** 2
@@ -377,6 +423,7 @@ def solve_winkler(domain, f, params: dict, *, vol_quad_deg: int = VOL_QUAD_DEG):
     clamp_centers = params["clamp_centers"]
     r_clamp = float(params["r_clamp"])
     eps_sigmoid = float(params["eps_sigmoid"])
+    grounded = bool(params["grounded"])
 
     lam = fem.Constant(domain, E * nu / ((1.0 + nu) * (1.0 - 2.0 * nu)))
     mu = fem.Constant(domain, E / (2.0 * (1.0 + nu)))
@@ -397,33 +444,46 @@ def solve_winkler(domain, f, params: dict, *, vol_quad_deg: int = VOL_QUAD_DEG):
     a = ufl.inner(sigma(u), ufl.sym(ufl.grad(v))) * dx
     L = ufl.inner(f, v) * dx
 
-    tdim = domain.topology.dim
-    fdim = tdim - 1
-    domain.topology.create_connectivity(fdim, tdim)
-    ext_facets = dmesh.exterior_facet_indices(domain.topology)
-    facet_tags = dmesh.meshtags(
-        domain, fdim, ext_facets, np.ones(len(ext_facets), dtype=np.int32),
-    )
-    ds = ufl.Measure(
-        "ds", domain=domain,
-        subdomain_data=facet_tags, subdomain_id=1,
-        metadata={"quadrature_degree": 4 if degree == 2 else 2},
-    )
-    x = ufl.SpatialCoordinate(domain)
-    a = a + float(k_clamp) * _clamp_weight_ufl(
-        x, clamp_centers, r_clamp, eps_sigmoid,
-    ) * ufl.inner(u, v) * ds
+    if grounded:
+        tdim = domain.topology.dim
+        fdim = tdim - 1
+        domain.topology.create_connectivity(fdim, tdim)
+        ext_facets = dmesh.exterior_facet_indices(domain.topology)
+        facet_tags = dmesh.meshtags(
+            domain, fdim, ext_facets, np.ones(len(ext_facets), dtype=np.int32),
+        )
+        ds = ufl.Measure(
+            "ds", domain=domain,
+            subdomain_data=facet_tags, subdomain_id=1,
+            metadata={"quadrature_degree": 4 if degree == 2 else 2},
+        )
+        x = ufl.SpatialCoordinate(domain)
+        a = a + float(k_clamp) * _clamp_weight_ufl(
+            x, clamp_centers, r_clamp, eps_sigmoid,
+        ) * ufl.inner(u, v) * ds
+
+    petsc_options = {
+        "ksp_type": "preonly",
+        "pc_type": "lu",
+        "pc_factor_mat_solver_type": "mumps",
+    }
+    if not grounded:
+        # No grounding: K is singular with the 6 rigid-body modes. ICNTL(24)=1
+        # detects null pivot rows so MUMPS returns one particular solution
+        # (ICNTL(25)=0) instead of failing. Stress is gauge-invariant, u is not.
+        petsc_options["mat_mumps_icntl_24"] = 1
 
     problem = LinearProblem(
         a, L, bcs=[],
         petsc_options_prefix="full_body_elasticity2",
-        petsc_options={
-            "ksp_type": "preonly",
-            "pc_type": "lu",
-            "pc_factor_mat_solver_type": "mumps",
-        },
+        petsc_options=petsc_options,
     )
     uh = problem.solve()
+
+    if not grounded:
+        n_null = problem.solver.getPC().getFactorMatrix().getMumpsInfog(28)
+        print(f"MUMPS null pivots detected (INFOG(28)): {n_null} (expect 6)")
+        _remove_rigid_body(uh)
 
     vm_quad_degree = 2 if degree == 2 else 1
     vol_quad_el = basix.ufl.quadrature_element(
@@ -442,6 +502,7 @@ def solve_winkler(domain, f, params: dict, *, vol_quad_deg: int = VOL_QUAD_DEG):
     vm_fn = fem.Function(W)
     vm_fn.interpolate(fem.Expression(von_mises_ufl(uh), interp_pts))
 
+    tdim = domain.topology.dim
     n_cells = domain.topology.index_map(tdim).size_local
     n_q = vm_fn.x.array.shape[0] // n_cells
     von_mises_Pa = np.asarray(
@@ -453,6 +514,9 @@ def solve_winkler(domain, f, params: dict, *, vol_quad_deg: int = VOL_QUAD_DEG):
 
 def _clamp_weight_at(points, centers, r_clamp, eps_sigmoid):
     from coil_fem.utils import clamp_sigmoid
+    centers = np.asarray(centers, dtype=np.float64).reshape(-1, 3)
+    if centers.shape[0] == 0:
+        return np.zeros(len(points), dtype=np.float64)
     pts = jnp.asarray(points, dtype=jnp.float64)
     ctr = jnp.asarray(centers, dtype=jnp.float64)
     d_sq = jnp.sum((pts[:, None, :] - ctr[None, :, :]) ** 2, axis=-1)
@@ -536,13 +600,35 @@ def main():
     )
     f = _pack_quadrature_force(domain, f_vol_q, VOL_QUAD_DEG)
 
-    print(
-        f"solving: E={params['E']:.3e} Pa, nu={params['nu']}, "
-        f"k_clamp={params['k_clamp']:.3e} N/m³, "
-        f"n_clamps={params['clamp_centers'].shape[0]}, "
-        f"r_clamp={params['r_clamp']:.4g}, "
-        f"eps_sigmoid={params['eps_sigmoid']:.4g}"
+    F, T, scale_F, scale_T = load_resultants(
+        domain, f, vol_quad_deg=VOL_QUAD_DEG,
     )
+    ratio_F = np.linalg.norm(F) / max(scale_F, 1e-300)
+    ratio_T = np.linalg.norm(T) / max(scale_T, 1e-300)
+    print(
+        f"load resultants: |F|={np.linalg.norm(F):.3e} N "
+        f"(rel {ratio_F:.3e}), |T|={np.linalg.norm(T):.3e} N·m "
+        f"(rel {ratio_T:.3e})"
+    )
+    if not params["grounded"] and max(ratio_F, ratio_T) > 1e-6:
+        print(
+            "WARNING: ungrounded load is inconsistent "
+            f"(rel force/torque > 1e-6); solution is not trustworthy"
+        )
+
+    if params["grounded"]:
+        print(
+            f"solving: grounded=True, E={params['E']:.3e} Pa, nu={params['nu']}, "
+            f"k_clamp={params['k_clamp']:.3e} N/m³, "
+            f"n_clamps={params['clamp_centers'].shape[0]}, "
+            f"r_clamp={params['r_clamp']:.4g}, "
+            f"eps_sigmoid={params['eps_sigmoid']:.4g}"
+        )
+    else:
+        print(
+            f"solving: grounded=False, E={params['E']:.3e} Pa, "
+            f"nu={params['nu']} (MUMPS null-pivot detection)"
+        )
     t0 = time.time()
     uh, vm = solve_winkler(domain, f, params, vol_quad_deg=VOL_QUAD_DEG)
     print(f"solve time: {time.time() - t0:.1f} s")
@@ -550,6 +636,11 @@ def main():
         f"|u|_max = "
         f"{np.linalg.norm(uh.x.array.reshape(-1, 3), axis=1).max():.3e} m"
     )
+    if not params["grounded"]:
+        print(
+            "displacement gauge-fixed by least-squares rigid-body removal; "
+            "von Mises is gauge-invariant"
+        )
     print(
         f"von Mises range: "
         f"[{vm.min() / 1e6:.3g}, {vm.max() / 1e6:.3g}] MPa"
