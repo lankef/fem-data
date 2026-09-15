@@ -116,11 +116,6 @@ csr_options = {
     "nu": beam_options["nu"],
 }
 
-# Coil-surface distance
-Jcsdist_init = CurveSurfaceDistance(base_curves, plasma_surface, 0)
-dmin_cp = Jcsdist_init.shortest_distance()
-
-
 # Circular CSR: R=4 m, section 0.3 x 0.5 m, Fourier order 2.
 csr_order = 1 # 2
 csr_r = 3.5
@@ -214,7 +209,9 @@ Jcsrcc = CSRCurveDistance(coil_support, dmin_csrcc)
 
 # ----- CSR–plasma surface distance -----
 
-dmin_csrs = dmin_csrcc + dmin_cp
+# Coil-surface distance
+
+dmin_csrs = dmin_csrcc + min_csd
 Jcsrs = CSRSurfaceDistance(coil_support, plasma_surface, dmin_csrs)
 
 # ----- Optimization -----
