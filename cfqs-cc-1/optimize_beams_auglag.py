@@ -53,9 +53,6 @@ _ROOT = Path(__file__).resolve().parent.parent
 cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
 
-# Setting beam parameters
-w1_beam = 0.05
-w2_beam = 0.1
 fixed_dof_names = [
     # "thetas_orientation_cc",
     "w1_beam",
@@ -78,6 +75,9 @@ problem_options = opts["problem_options"]
 physics_options = opts["physics_options"]
 beam_options = opts["beam_options"]
 fixed_clamp_options = opts["fixed_clamp_options"]
+w1_beam = opts["w1_beam"]
+w2_beam = opts["w2_beam"]
+
 
 # ----- Adding stellarator-symmetric beams -----
 
@@ -114,7 +114,7 @@ Jstress = CoilFEMObjective(
 )
 save([Jstress], "init_Jstress_auglag.json")
 Jstress_init = float(Jstress.J())
-Jstress.save_run_vtu("init_run_auglag")
+Jstress.save_run_vtu("init_auglag")
 with open("init_summary_auglag.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
@@ -351,7 +351,7 @@ if result_code < 0:
         "(x0 if no step was accepted)."
     )
 save([Jstress], "fin_Jstress_auglag.json")
-Jstress.save_run_vtu("fin_run_auglag")
+Jstress.save_run_vtu("fin_auglag")
 with open("fin_results_auglag.pkl", "wb") as file:
     pickle.dump({
         "result_code": result_code,

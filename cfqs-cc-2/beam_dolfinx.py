@@ -37,7 +37,7 @@ from dolfinx.mesh import create_mesh
 from coil_fem.magnetic import biot_savart, B_self_quadrature, lorentz_body_force
 
 VTU_PATH = "full_body_fields.vtu"
-JSTRESS_PATH = "Jstress.json"
+JSTRESS_PATH = "../fin_Jstress_auglag.json"
 OUT_VTU = "full_body_elasticity.vtu"
 VOL_QUAD_DEG = 4
 CHUNK = 32_768

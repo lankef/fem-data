@@ -34,9 +34,6 @@ _ROOT = Path(__file__).resolve().parent.parent
 cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
 
-# Setting beam parameters
-w1_beam = 0.05
-w2_beam = 0.1
 fixed_dof_names = [
     # "thetas_orientation_cc",
     "w1_beam",
@@ -58,8 +55,9 @@ gravity_options = opts["gravity_options"]
 problem_options = opts["problem_options"]
 physics_options = opts["physics_options"]
 beam_options = opts["beam_options"]
-# beam_options["cross_section_type"] = "hollow_rectangle"
 fixed_clamp_options = opts["fixed_clamp_options"]
+w1_beam = opts["w1_beam"]
+w2_beam = opts["w2_beam"]
 
 # ----- Defining optimizable ----- 
 
@@ -90,7 +88,7 @@ Jstress = CoilFEMObjective(
     coupling         = "monolithic",
 )
 save([Jstress], "init_Jstress.json")
-Jstress.save_run_vtu("init_run")
+Jstress.save_run_vtu("init")
 with open("init_summary.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
@@ -193,7 +191,7 @@ time_filament_2 = time.time()
 print("time", time_filament_2 - time_filament_1)
 print("res ", res)
 save([Jstress], "fin_Jstress.json")
-Jstress.save_run_vtu("fin_run")
+Jstress.save_run_vtu("fin")
 with open("fin_results.pkl", "wb") as file:
     pickle.dump({
         "res": res,

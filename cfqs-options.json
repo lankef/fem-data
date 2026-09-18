@@ -1,8 +1,8 @@
 {
   "mesh_options": {
     "shape": "rect",
-    "w1": 0.132,
-    "w2": 0.069,
+    "w1": 0.152,
+    "w2": 0.099,
     "frame": "centroid",
     "aspect_ratio": 1.0,
     "mesh_type": "TET10",
@@ -39,5 +39,7 @@
     "r_clamp": 0.173,
     "n_clamp": 0,
     "E_coil": 100000000000.0
-  }
+  },
+  "w1_beam": 0.05,
+  "w2_beam": 0.1
 }

@@ -2,7 +2,7 @@
 #SBATCH --account=torch_pr_292_courant
 #SBATCH --array=0-1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=100G
+#SBATCH --mem=50G
 #SBATCH --time=00:40:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
@@ -26,7 +26,7 @@ echo "CPUs per task:  $SLURM_CPUS_PER_TASK"
 echo "Start time:     $(date)"
 conda activate desc
 
-CASES=(fin init)
+CASES=(fin_auglag init_auglag)
 CASE="${CASES[$SLURM_ARRAY_TASK_ID]}"
 RUN_DIR="${CASE}_dolfinx"
 
