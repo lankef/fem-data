@@ -18,11 +18,13 @@ print(f"[{case}] to_full_body done in {time.time()-t0:.1f}s")
 
 m = meshio.read(out)
 counts = {c.type: len(c.data) for c in m.cells}
-oc = m.point_data.get("owner_coil")
-osym = m.point_data.get("owner_sym")
+oc = m.cell_data.get("owner_coil")
+osym = m.cell_data.get("owner_sym")
 print(f"[{case}] points={m.points.shape[0]} cells={counts}")
-if oc is not None:
-    print(f"[{case}] owner_coil>=0: {int((oc>=0).sum())}/{oc.size} "
+if oc:
+    oc = np.concatenate([np.asarray(a).ravel() for a in oc])
+    print(f"[{case}] owner_coil>=0: {int((oc>=0).sum())}/{oc.size} cells "
           f"(coils {sorted(set(oc[oc>=0].tolist()))})")
-if osym is not None:
-    print(f"[{case}] owner_sym>=0: {int((osym>=0).sum())}/{osym.size}")
+if osym:
+    osym = np.concatenate([np.asarray(a).ravel() for a in osym])
+    print(f"[{case}] owner_sym>=0: {int((osym>=0).sum())}/{osym.size} cells")
