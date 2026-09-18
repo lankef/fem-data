@@ -22,16 +22,19 @@ from coil_fem.simsopt import (
 from simsopt.geo import CurveSurfaceDistance
 from simsopt import save, load
 import json
+import sys
 import numpy as np
 import time
 import pickle
-from collections import defaultdict
 from pathlib import Path
-from scipy.optimize import minimize, Bounds, LinearConstraint
+from scipy.optimize import minimize, Bounds
 
 MAXITER = 1000
 
 _ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from opt_utils import sum_dphis_constraint
 cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
 
@@ -151,36 +154,11 @@ def fun(dofs):
     return J, grad
 
 
-def _sum_dphis_constraint(dof_names):
-    """Linear inequalities sum_j dphis*[i][j] <= 1 for each coil/group.
-
-    Applies to free DOFs named ``dphis_start_cc`` and ``dphis_end_cc``
-    (simsopt names like ``...:dphis_start_cc(i,j)``).
-    """
-    keys = ("dphis_start_cc", "dphis_end_cc")
-    groups = defaultdict(list)
-    for j, name in enumerate(dof_names):
-        # simsopt: "CoilSupportBeamsSorted1:dphis_start_cc(0,3)"
-        local = name.split(":", 1)[-1]
-        key = local.split("(", 1)[0]
-        if key not in keys:
-            continue
-        i_coil = int(local.split("(", 1)[1].split(",", 1)[0])
-        groups[(key, i_coil)].append(j)
-    n = len(dof_names)
-    if not groups:
-        return LinearConstraint(np.zeros((0, n)), -np.inf, np.zeros(0))
-    A = np.zeros((len(groups), n))
-    for row, idxs in enumerate(groups.values()):
-        A[row, idxs] = 1.0
-    return LinearConstraint(A, -np.inf, np.ones(A.shape[0]))
-
-
 dofs = Jstress.x
 lb, ub = Jstress.bounds
 bounds = Bounds(lb, ub)
 constraints = [
-    _sum_dphis_constraint(Jstress.dof_names),
+    sum_dphis_constraint(Jstress.dof_names),
     constraint_from_optimizable(Jbsd, -np.inf, 0),
     constraint_from_optimizable(Jbca, -np.inf, 0),
     constraint_from_optimizable(Jbbd, -np.inf, 0),

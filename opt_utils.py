@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import jax.numpy as jnp
-from scipy.optimize import Bounds, NonlinearConstraint
+from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 from simsopt._core.optimizable import Optimizable
 from simsopt.mhd import Vmec
 from simsopt.mhd.virtual_casing import VirtualCasing
@@ -224,3 +224,113 @@ def build_problem(objective, constraint_specs, linear_constraint_fns=None):
 
     lb_arr, ub_arr = prob.bounds
     return prob.x.copy(), fun, Bounds(lb_arr, ub_arr), constraints
+
+
+def sum_dphis_A(dof_names, keys=("dphis_start_cc", "dphis_end_cc")):
+    """Matrix whose rows sum ``dphis`` increments per coil or group.
+
+    ``dof_names`` are simsopt names such as
+    ``CoilSupportBeamsSorted1:dphis_start_cc(i,j)``.  Each row of the
+    returned array selects one ``(key, coil)`` group.
+    """
+    from collections import defaultdict
+
+    groups = defaultdict(list)
+    for j, name in enumerate(dof_names):
+        local = name.split(":", 1)[-1]
+        key = local.split("(", 1)[0]
+        if key not in keys:
+            continue
+        i_coil = int(local.split("(", 1)[1].split(",", 1)[0])
+        groups[(key, i_coil)].append(j)
+    n = len(dof_names)
+    if not groups:
+        return np.zeros((0, n))
+    A = np.zeros((len(groups), n))
+    for row, idxs in enumerate(groups.values()):
+        A[row, idxs] = 1.0
+    return A
+
+
+def sum_dphis_constraint(dof_names, keys=("dphis_start_cc", "dphis_end_cc")):
+    """Linear inequalities ``sum_j dphis[i, j] <= 1`` for each coil or group."""
+    A = sum_dphis_A(dof_names, keys)
+    ub = np.ones(A.shape[0]) if A.shape[0] else np.zeros(0)
+    return LinearConstraint(A, -np.inf, ub)
+
+
+def inboard_clamp_phis(base_coils, n_samples=512):
+    """One clamp angle per coil at the inboard midplane.
+
+    For each coil the clamp sits on the curve at the same ``z`` as the
+    Fourier centre, on the side of smaller cylindrical radius
+    ``r = sqrt(x^2 + y^2)``.
+
+    Parameters
+    ----------
+    base_coils : sequence of Coil or Curve
+        Base coils (or their curves) before symmetry expansion.
+    n_samples : int
+        Dense sample count used when the curve's own quadpoints are coarser.
+
+    Returns
+    -------
+    ndarray, shape ``(n_coils, 1)``
+        Clamp angles in ``[0, 1)``.
+    """
+    def curve_from_coil(obj):
+        return obj.curve if hasattr(obj, "curve") else obj
+
+    def eval_xyz(curve, phis):
+        """``CurveXYZFourier`` at ``phis`` in ``[0, 1)``, simsopt dof order."""
+        dofs = np.asarray(curve.get_dofs(), dtype=float)
+        order = int(curve.order)
+        k = 2 * order + 1
+        theta = 2.0 * np.pi * np.asarray(phis, dtype=float)
+        out = np.empty(theta.shape + (3,), dtype=float)
+        for i in range(3):
+            c = dofs[i * k:(i + 1) * k]
+            val = np.full(theta.shape, c[0], dtype=float)
+            for m in range(1, order + 1):
+                val = val + c[2 * m - 1] * np.sin(m * theta) + c[2 * m] * np.cos(m * theta)
+            out[..., i] = val
+        return out
+
+    def inboard_phi(curve):
+        dofs = np.asarray(curve.get_dofs(), dtype=float)
+        k = 2 * int(curve.order) + 1
+        zc = float(dofs[2 * k])
+        qp = np.asarray(getattr(curve, "quadpoints", []), dtype=float)
+        phis = qp if qp.size >= n_samples else np.linspace(0.0, 1.0, n_samples, endpoint=False)
+        xyz = eval_xyz(curve, phis)
+        dz = xyz[:, 2] - zc
+        n = phis.size
+        crossings = []
+        for i in range(n):
+            j = (i + 1) % n
+            zi, zj = dz[i], dz[j]
+            if zi == 0.0:
+                crossings.append(float(phis[i] % 1.0))
+                continue
+            if zi * zj > 0.0 or zj == 0.0:
+                continue
+            dphi = phis[j] - phis[i]
+            if dphi <= 0.0:
+                dphi += 1.0
+            t = zi / (zi - zj)
+            crossings.append(float((phis[i] + t * dphi) % 1.0))
+        uniq = []
+        tol = 0.5 / max(n, 1)
+        for phi in crossings:
+            if not any(min(abs(phi - u), 1.0 - abs(phi - u)) < tol for u in uniq):
+                uniq.append(phi)
+        if not uniq:
+            raise ValueError(
+                "Coil curve never crosses z = z_center; cannot place an inboard clamp."
+            )
+        pts = eval_xyz(curve, np.asarray(uniq))
+        r = np.sqrt(pts[:, 0] ** 2 + pts[:, 1] ** 2)
+        return float(uniq[int(np.argmin(r))])
+
+    phis = [inboard_phi(curve_from_coil(obj)) for obj in base_coils]
+    return np.asarray(phis, dtype=float).reshape(-1, 1)

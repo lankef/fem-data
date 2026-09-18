@@ -8,8 +8,8 @@
 #SBATCH --error=logs/slurm_%A_%a.err
 
 # Array job: each task runs beam_dolfinx.py against one of the two exported
-# cases (fin_dolfinx/, init_dolfinx/), produced earlier by run_export.py from
-# Jstress_fin.json / Jstress_init.json.
+# cases (fin_auglag_dolfinx/, init_auglag_dolfinx/), produced earlier by
+# run_export.py from fin_auglag_Jstress.json / init_auglag_Jstress.json.
 #   sbatch jobscript_dolfinx.sh
 
 mkdir -p logs
@@ -39,7 +39,7 @@ if [[ ! -d "$RUN_DIR" ]]; then
 fi
 
 cd "$RUN_DIR"
-ln -sf "../Jstress_${CASE}.json" Jstress.json
+ln -sf "../${CASE}_Jstress.json" Jstress.json
 
 python -u ../beam_dolfinx.py
 

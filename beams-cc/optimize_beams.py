@@ -38,7 +38,7 @@ from scipy.optimize import minimize, Bounds, LinearConstraint
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
-from shared import inboard_clamp_phis
+from opt_utils import inboard_clamp_phis
 
 # Loading the W7-X standard configuration 
 # plasma surface. wout file comes from Landreman"s

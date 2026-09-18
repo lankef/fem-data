@@ -22,6 +22,7 @@ from coil_fem.simsopt import (
 from simsopt.geo import CurveSurfaceDistance
 from simsopt import save, load
 import json
+import sys
 import numpy as np
 import time
 import pickle
@@ -47,9 +48,10 @@ _NLOPT_RESULT = {
     5: "MAXEVAL_REACHED",
     6: "MAXTIME_REACHED",
 }
-_EVAL_LOG = Path("auglag_evals.jsonl")
-
 _ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+from opt_utils import sum_dphis_A
 cfqs_dict = load(str(_ROOT / "cfqs-data" / "cfqs_data.json"))
 plasma_surface = cfqs_dict['plasma_surface']
 
@@ -113,10 +115,10 @@ Jstress = CoilFEMObjective(
     physics_options  = physics_options,
     coupling         = "monolithic",
 )
-save([Jstress], "init_Jstress_auglag.json")
+save([Jstress], "init_auglag_Jstress.json")
 Jstress_init = float(Jstress.J())
-Jstress.save_run_vtu("init_run_auglag")
-with open("init_summary_auglag.json", "w") as fp:
+Jstress.save_run_vtu("init_auglag")
+with open("init_auglag_summary.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)
 print("# mesh node for all coils:", Jstress.n_nodes)
@@ -159,26 +161,6 @@ for cur in base_currents:
 
 
 _counts = defaultdict(int)
-_t0 = None
-_x0 = None
-
-
-def _log(record):
-    """Append one JSON line and echo it. Survives a killed slurm job."""
-    record["t"] = time.time() - _t0
-    line = json.dumps(record, default=float)
-    print(line, flush=True)
-    with open(_EVAL_LOG, "a") as fp:
-        fp.write(line + "\n")
-
-
-def _arr_stats(name, a):
-    a = np.asarray(a, dtype=float)
-    return {
-        f"{name}_norm": float(np.linalg.norm(a)),
-        f"{name}_maxabs": float(np.max(np.abs(a))) if a.size else 0.0,
-        f"{name}_finite": bool(np.all(np.isfinite(a))),
-    }
 
 
 def nlopt_fun(x, grad):
@@ -186,23 +168,9 @@ def nlopt_fun(x, grad):
     _counts["f"] += 1
     _counts["f_grad"] += int(want_grad)
     Jstress.x = x
-    g = None
     if want_grad:
-        g = np.asarray(Jstress.dJ() / Jstress_init, dtype=float)
-        grad[:] = g
-    val = float(Jstress.J()) / Jstress_init
-    rec = {
-        "kind": "f",
-        "n": _counts["f"],
-        "want_grad": want_grad,
-        "J": val,
-        "dx": float(np.linalg.norm(np.asarray(x) - _x0)),
-        **_arr_stats("x", x),
-    }
-    if g is not None:
-        rec.update(_arr_stats("g", g))
-    _log(rec)
-    return val
+        grad[:] = np.asarray(Jstress.dJ() / Jstress_init, dtype=float)
+    return float(Jstress.J()) / Jstress_init
 
 
 def nlopt_ineq_from_optimizable(obj, weight=1.0, tag="c"):
@@ -211,53 +179,11 @@ def nlopt_ineq_from_optimizable(obj, weight=1.0, tag="c"):
         want_grad = grad.size > 0
         _counts[tag] += 1
         obj.x = x
-        raw = float(obj.J())
-        val = float(weight * raw)
+        val = float(weight * obj.J())
         if want_grad:
-            g = weight * np.asarray(obj.dJ(), dtype=float)
-            grad[:] = g
-            g_finite = bool(np.all(np.isfinite(g)))
-        else:
-            g_finite = True
-        # Constraints are cheap; log residuals every call so we see AUGLAG's
-        # first rho-setup eval and any NaN/Inf.
-        _log({
-            "kind": tag,
-            "n": _counts[tag],
-            "want_grad": want_grad,
-            "c": val,
-            "c_raw": raw,
-            "c_finite": bool(np.isfinite(val)),
-            "g_finite": g_finite,
-            "dx": float(np.linalg.norm(np.asarray(x) - _x0)),
-        })
+            grad[:] = weight * np.asarray(obj.dJ(), dtype=float)
         return val
     return fc
-
-
-def _sum_dphis_A(dof_names):
-    """Build A for inequalities sum_j dphis*[i][j] <= 1 per coil/group.
-
-    Applies to free DOFs named ``dphis_start_cc`` and ``dphis_end_cc``
-    (simsopt names like ``...:dphis_start_cc(i,j)``).
-    """
-    keys = ("dphis_start_cc", "dphis_end_cc")
-    groups = defaultdict(list)
-    for j, name in enumerate(dof_names):
-        # simsopt: "CoilSupportBeamsSorted1:dphis_start_cc(0,3)"
-        local = name.split(":", 1)[-1]
-        key = local.split("(", 1)[0]
-        if key not in keys:
-            continue
-        i_coil = int(local.split("(", 1)[1].split(",", 1)[0])
-        groups[(key, i_coil)].append(j)
-    n = len(dof_names)
-    if not groups:
-        return np.zeros((0, n))
-    A = np.zeros((len(groups), n))
-    for row, idxs in enumerate(groups.values()):
-        A[row, idxs] = 1.0
-    return A
 
 
 def nlopt_dphis_ineq(A_row):
@@ -273,13 +199,11 @@ dofs = np.asarray(Jstress.x, dtype=float)
 lb, ub = Jstress.bounds
 lb = np.asarray(lb, dtype=float)
 ub = np.asarray(ub, dtype=float)
-A = _sum_dphis_A(Jstress.dof_names)
+A = sum_dphis_A(Jstress.dof_names)
 dphis_c = A @ dofs - 1.0
 
 n = len(dofs)
 _x0 = dofs.copy()
-if _EVAL_LOG.exists():
-    _EVAL_LOG.unlink()
 
 # Snapshot at x0 before AUGLAG. Jbsd/Jbca are FEM-free; J/dJ reuse the
 # init solve already paid for by summary() / save_run_vtu.
@@ -351,9 +275,9 @@ if result_code < 0:
         "script continued and wrote fin_* at the last evaluated x "
         "(x0 if no step was accepted)."
     )
-save([Jstress], "fin_Jstress_auglag.json")
-Jstress.save_run_vtu("fin_run_auglag")
-with open("fin_results_auglag.pkl", "wb") as file:
+save([Jstress], "fin_auglag_Jstress.json")
+Jstress.save_run_vtu("fin_auglag")
+with open("fin_auglag_results.pkl", "wb") as file:
     pickle.dump({
         "result_code": result_code,
         "result_name": result_name,
@@ -370,6 +294,6 @@ with open("fin_results_auglag.pkl", "wb") as file:
         "time": time_filament_2 - time_filament_1,
     }, file)
 
-with open("fin_summary_auglag.json", "w") as fp:
+with open("fin_auglag_summary.json", "w") as fp:
     summary = Jstress.summary()
     json.dump(summary, fp)

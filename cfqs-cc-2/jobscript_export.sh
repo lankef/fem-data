@@ -8,8 +8,8 @@
 #SBATCH --error=logs/slurm_%A_%a.err
 
 # Array job: each task runs run_export.py against one of the two cases
-# (init_auglag, fin_auglag), reading Jstress_init_auglag.json /
-# Jstress_fin_auglag.json and writing init_auglag_dolfinx/, fin_auglag_dolfinx/.
+# (init_auglag, fin_auglag), reading init_auglag_Jstress.json /
+# fin_auglag_Jstress.json and writing init_auglag_dolfinx/, fin_auglag_dolfinx/.
 #   sbatch jobscript_export.sh
 
 mkdir -p logs
